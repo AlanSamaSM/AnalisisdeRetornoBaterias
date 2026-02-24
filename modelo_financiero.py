@@ -28,6 +28,62 @@ MESES_MAP = {
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES AUXILIARES PARA TARIFAS Y CONSUMO BASE
+# ─────────────────────────────────────────────────────────────────────────────
+def limpiar_numero(valor):
+    """Limpia un valor numerico que puede venir como string con formato."""
+    if isinstance(valor, str):
+        return float(valor.replace(' ', '').replace(',', '').replace('%', ''))
+    return float(valor)
+
+
+def extraer_mes_base(mes_str):
+    """Extrae el nombre del mes sin sub-periodos."""
+    mes_limpio = mes_str.strip().upper()
+    for sufijo in [' SUB-PERIODO 1', ' SUB-PERIODO 2', ' SUB-PERIODO 1 ']:
+        mes_limpio = mes_limpio.replace(sufijo, '')
+    return mes_limpio.strip()
+
+
+def cargar_datos_consumo_y_tarifas():
+    """Carga las bases de datos de consumos y tarifas GDMTH."""
+    consumos_df = pd.read_csv(
+        r'BASE DE DATOS DE CONSUMOS\BASE DE DATO DE CONSUMO.csv',
+        encoding='latin-1'
+    )
+    tarifas_df = pd.read_csv(
+        r'BASE DE DATOS TARIFAS GDMTH\Base de dato.csv',
+        encoding='latin-1'
+    )
+    estado = consumos_df.iloc[0]['Estado'].strip()
+    municipio = str(consumos_df.iloc[0]['Municipio ']).strip()
+    return consumos_df, tarifas_df, estado, municipio
+
+
+def obtener_tarifa_base(tarifas_df, estado, municipio, mes):
+    """Obtiene la tarifa BASE ($/kWh) para un estado, municipio y mes."""
+    fila = tarifas_df[
+        (tarifas_df['Estado'].str.strip().str.upper() == estado.upper()) &
+        (tarifas_df['Munucipio'].str.strip().str.upper() == municipio.upper()) &
+        (tarifas_df['Mes'].str.strip().str.upper() == mes.upper()) &
+        (tarifas_df['Int. Horario'].astype(str).str.strip().str.upper() == 'BASE')
+    ]
+    if len(fila) > 0:
+        return limpiar_numero(fila.iloc[0]['Monto'])
+    return None
+
+
+def construir_consumo_base_por_periodo(consumos_df):
+    """Construye un diccionario de consumo BASE (kWh) por periodo."""
+    consumo_map = {}
+    for _, row in consumos_df.iterrows():
+        mes_original = row['Mes'].strip()
+        consumo_base = limpiar_numero(row['Consumo base'])
+        consumo_map[mes_original.upper()] = consumo_base
+    return consumo_map
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # ENTRADA DE DATOS DEL USUARIO
 # ─────────────────────────────────────────────────────────────────────────────
 def solicitar_parametros():
@@ -82,8 +138,15 @@ def solicitar_parametros():
 # ─────────────────────────────────────────────────────────────────────────────
 # SIMULACIÓN BESS
 # ─────────────────────────────────────────────────────────────────────────────
-def ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df, region='NORTE'):
-    """Ejecuta la simulación BESS periodo a periodo y retorna DataFrame de resultados."""
+def ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df,
+                             tarifas_df=None, estado=None, municipio=None,
+                             consumo_base_map=None, region='NORTE'):
+    """Ejecuta la simulación BESS periodo a periodo.
+    Incluye:
+      - Ahorro en cargo por capacidad (descarga en PUNTA)
+      - Costo adicional por carga del BESS en horario BASE
+      - Ahorro neto = ahorro capacidad - costo carga BASE
+    """
     simulador = SimuladorBESS(potencia_kw, capacidad_kwh, region=region)
     resultados = []
 
@@ -99,6 +162,7 @@ def ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df, region='NORT
         tarifa_cap = row['Tarifa Cap ($/kW)']
         d_minima_formula = row['D_fact_pre (kW)']
 
+        # --- DESCARGA EN PUNTA: ahorro en cargo por capacidad ---
         resultado_bess = simulador.reducir_demanda_punta(d_punta_original, mes_num)
         simulacion = resultado_bess['simulacion']
         d_punta_nueva = resultado_bess['demanda_nueva']
@@ -106,8 +170,32 @@ def ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df, region='NORT
         d_facturable_con_bess = min(d_punta_nueva, d_minima_formula)
         cargo_sin_bess = min(d_punta_original, d_minima_formula) * tarifa_cap
         cargo_con_bess = d_facturable_con_bess * tarifa_cap
-        ahorro = cargo_sin_bess - cargo_con_bess
-        ahorro_pct = (ahorro / cargo_sin_bess) * 100 if cargo_sin_bess > 0 else 0
+        ahorro_capacidad = cargo_sin_bess - cargo_con_bess
+        ahorro_cap_pct = (ahorro_capacidad / cargo_sin_bess) * 100 if cargo_sin_bess > 0 else 0
+
+        # --- CARGA EN BASE: costo adicional por llenado del BESS ---
+        carga_info = simulador.calcular_carga_base(dias_laborales=dias)
+        energia_carga_base = carga_info['energia_carga_mes_kwh']
+        potencia_carga_kw = carga_info['potencia_carga_kw']
+
+        # Obtener tarifa BASE y consumo BASE original
+        tarifa_base = 0
+        consumo_base_original = 0
+        costo_carga_base = 0
+        consumo_base_nuevo = 0
+
+        if tarifas_df is not None and estado and municipio:
+            tarifa_base = obtener_tarifa_base(tarifas_df, estado, municipio, mes_str) or 0
+            costo_carga_base = energia_carga_base * tarifa_base
+
+        if consumo_base_map:
+            periodo_upper = periodo.strip().upper()
+            consumo_base_original = consumo_base_map.get(periodo_upper, 0)
+            consumo_base_nuevo = consumo_base_original + energia_carga_base
+
+        # --- AHORRO NETO: ahorro capacidad - costo carga BASE ---
+        ahorro_neto = ahorro_capacidad - costo_carga_base
+        ahorro_neto_pct = (ahorro_neto / cargo_sin_bess) * 100 if cargo_sin_bess > 0 else 0
 
         resultados.append({
             'Periodo': periodo,
@@ -124,8 +212,18 @@ def ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df, region='NORT
             'Tarifa_Cap': tarifa_cap,
             'Cargo_SinBESS': round(cargo_sin_bess, 2),
             'Cargo_ConBESS': round(cargo_con_bess, 2),
-            'Ahorro': round(ahorro, 2),
-            'Ahorro_Pct': round(ahorro_pct, 2)
+            'Ahorro_Capacidad': round(ahorro_capacidad, 2),
+            'Ahorro_Cap_Pct': round(ahorro_cap_pct, 2),
+            # Columnas de carga BASE
+            'Consumo_BASE_Original_kWh': round(consumo_base_original, 2),
+            'Energia_Carga_BESS_kWh': round(energia_carga_base, 2),
+            'Consumo_BASE_Nuevo_kWh': round(consumo_base_nuevo, 2),
+            'Potencia_Carga_kW': round(potencia_carga_kw, 2),
+            'Tarifa_BASE': round(tarifa_base, 6),
+            'Costo_Carga_BASE': round(costo_carga_base, 2),
+            # Ahorro neto
+            'Ahorro_Neto': round(ahorro_neto, 2),
+            'Ahorro_Neto_Pct': round(ahorro_neto_pct, 2)
         })
 
     return pd.DataFrame(resultados)
@@ -135,22 +233,33 @@ def ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df, region='NORT
 # TABLA 1: COMPARATIVO MENSUAL DE RECIBOS
 # ─────────────────────────────────────────────────────────────────────────────
 def generar_comparativo_mensual(sim_df):
-    """Genera tabla comparativa mensual estilo propuesta Quartux."""
-    comparativo = sim_df[['Periodo', 'Cargo_SinBESS', 'Cargo_ConBESS', 'Ahorro', 'Ahorro_Pct']].copy()
-    comparativo.columns = ['Periodo', 'Facturacion s/ bateria', 'Facturacion c/ bateria', 'Ahorro', 'Porcentaje de Ahorro']
+    """Genera tabla comparativa mensual estilo propuesta Quartux.
+    Incluye ahorro por capacidad, costo de carga BASE y ahorro neto."""
+    comparativo = sim_df[[
+        'Periodo', 'Cargo_SinBESS', 'Cargo_ConBESS',
+        'Ahorro_Capacidad', 'Costo_Carga_BASE', 'Ahorro_Neto', 'Ahorro_Neto_Pct'
+    ]].copy()
+    comparativo.columns = [
+        'Periodo', 'Cargo Capacidad s/ BESS', 'Cargo Capacidad c/ BESS',
+        'Ahorro Capacidad', 'Costo Carga BASE', 'Ahorro Neto', '% Ahorro Neto'
+    ]
 
     # Fila de totales
-    total_sin = comparativo['Facturacion s/ bateria'].sum()
-    total_con = comparativo['Facturacion c/ bateria'].sum()
-    total_ahorro = comparativo['Ahorro'].sum()
-    total_pct = (total_ahorro / total_sin) * 100 if total_sin > 0 else 0
+    total_sin = comparativo['Cargo Capacidad s/ BESS'].sum()
+    total_con = comparativo['Cargo Capacidad c/ BESS'].sum()
+    total_ahorro_cap = comparativo['Ahorro Capacidad'].sum()
+    total_costo_carga = comparativo['Costo Carga BASE'].sum()
+    total_ahorro_neto = comparativo['Ahorro Neto'].sum()
+    total_pct = (total_ahorro_neto / total_sin) * 100 if total_sin > 0 else 0
 
     fila_total = pd.DataFrame([{
         'Periodo': 'TOTAL ANUAL',
-        'Facturacion s/ bateria': round(total_sin, 2),
-        'Facturacion c/ bateria': round(total_con, 2),
-        'Ahorro': round(total_ahorro, 2),
-        'Porcentaje de Ahorro': round(total_pct, 2)
+        'Cargo Capacidad s/ BESS': round(total_sin, 2),
+        'Cargo Capacidad c/ BESS': round(total_con, 2),
+        'Ahorro Capacidad': round(total_ahorro_cap, 2),
+        'Costo Carga BASE': round(total_costo_carga, 2),
+        'Ahorro Neto': round(total_ahorro_neto, 2),
+        '% Ahorro Neto': round(total_pct, 2)
     }])
 
     comparativo = pd.concat([comparativo, fila_total], ignore_index=True)
@@ -238,9 +347,12 @@ def imprimir_resultados(potencia_kw, capacidad_kwh, precio_usd, tipo_cambio,
     inversion_usd_iva = precio_usd
     inversion_mxn_iva = inversion_mxn
 
-    total_sin_bess = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Facturacion s/ bateria'].values[0]
-    total_con_bess = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Facturacion c/ bateria'].values[0]
-    pct_ahorro = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Porcentaje de Ahorro'].values[0]
+    total_sin_bess = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Cargo Capacidad s/ BESS'].values[0]
+    total_con_bess = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Cargo Capacidad c/ BESS'].values[0]
+    total_ahorro_cap = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Ahorro Capacidad'].values[0]
+    total_costo_carga = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Costo Carga BASE'].values[0]
+    total_ahorro_neto = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', 'Ahorro Neto'].values[0]
+    pct_ahorro = comparativo_df.loc[comparativo_df['Periodo'] == 'TOTAL ANUAL', '% Ahorro Neto'].values[0]
 
     # ═══════════════════════════════════════════════════════════════════════
     # ENCABEZADO
@@ -283,34 +395,37 @@ def imprimir_resultados(potencia_kw, capacidad_kwh, precio_usd, tipo_cambio,
     print(f'    T.C. informativo:          {tipo_cambio:.2f} MXN/USD')
     print(f'  ---------------------------------------------')
     print(f'                         Antes         Despues')
-    print(f'  Facturacion CFE:  ${total_sin_bess:>13,.2f}  ${total_con_bess:>13,.2f} MXN')
+    print(f'  Cargo Capacidad:  ${total_sin_bess:>13,.2f}  ${total_con_bess:>13,.2f} MXN')
     print(f'  ---------------------------------------------')
-    print(f'  Ahorro Anual Garantizado:    ${ahorro_anual:>15,.2f} MXN')
+    print(f'  Ahorro Capacidad (PUNTA):    ${total_ahorro_cap:>15,.2f} MXN')
+    print(f'  Costo Carga BESS (BASE):    -${total_costo_carga:>15,.2f} MXN')
+    print(f'  =============================================')
+    print(f'  AHORRO NETO ANUAL:           ${total_ahorro_neto:>15,.2f} MXN')
 
     # ═══════════════════════════════════════════════════════════════════════
     # COMPARATIVO DE RECIBOS MENSUAL
     # ═══════════════════════════════════════════════════════════════════════
-    print('\n' + '=' * 90)
-    print('  COMPARATIVO DE RECIBOS (Cargo por Capacidad)')
-    print('=' * 90)
+    print('\n' + '=' * 140)
+    print('  COMPARATIVO DE RECIBOS (Capacidad + Carga BASE)')
+    print('=' * 140)
 
     # Formatear para impresión
     display_df = comparativo_df.copy()
-    for col in ['Facturacion s/ bateria', 'Facturacion c/ bateria', 'Ahorro']:
+    for col in ['Cargo Capacidad s/ BESS', 'Cargo Capacidad c/ BESS', 'Ahorro Capacidad', 'Costo Carga BASE', 'Ahorro Neto']:
         display_df[col] = display_df[col].apply(lambda x: f'${x:>13,.2f}')
-    display_df['Porcentaje de Ahorro'] = display_df['Porcentaje de Ahorro'].apply(lambda x: f'{x:.0f}%')
+    display_df['% Ahorro Neto'] = display_df['% Ahorro Neto'].apply(lambda x: f'{x:.0f}%')
 
     # Separar datos y total
     datos = display_df[display_df['Periodo'] != 'TOTAL ANUAL']
     total = display_df[display_df['Periodo'] == 'TOTAL ANUAL']
 
-    print(f"\n  {'Periodo':<28} {'Facturacion s/ bateria':>22}  {'Facturacion c/ bateria':>22}  {'Ahorro':>15}  {'% Ahorro':>10}")
-    print('  ' + '-' * 105)
+    print(f"\n  {'Periodo':<28} {'Cap s/BESS':>15}  {'Cap c/BESS':>15}  {'Ahorro Cap':>15}  {'Costo Carga':>15}  {'Ahorro Neto':>15}  {'%':>6}")
+    print('  ' + '-' * 120)
     for _, row in datos.iterrows():
-        print(f"  {row['Periodo']:<28} {row['Facturacion s/ bateria']:>22}  {row['Facturacion c/ bateria']:>22}  {row['Ahorro']:>15}  {row['Porcentaje de Ahorro']:>10}")
-    print('  ' + '=' * 105)
+        print(f"  {row['Periodo']:<28} {row['Cargo Capacidad s/ BESS']:>15}  {row['Cargo Capacidad c/ BESS']:>15}  {row['Ahorro Capacidad']:>15}  {row['Costo Carga BASE']:>15}  {row['Ahorro Neto']:>15}  {row['% Ahorro Neto']:>6}")
+    print('  ' + '=' * 120)
     for _, row in total.iterrows():
-        print(f"  {row['Periodo']:<28} {row['Facturacion s/ bateria']:>22}  {row['Facturacion c/ bateria']:>22}  {row['Ahorro']:>15}  {row['Porcentaje de Ahorro']:>10}")
+        print(f"  {row['Periodo']:<28} {row['Cargo Capacidad s/ BESS']:>15}  {row['Cargo Capacidad c/ BESS']:>15}  {row['Ahorro Capacidad']:>15}  {row['Costo Carga BASE']:>15}  {row['Ahorro Neto']:>15}  {row['% Ahorro Neto']:>6}")
 
     # ═══════════════════════════════════════════════════════════════════════
     # TABLA DE INVERSIÓN DE CAPITAL
@@ -340,6 +455,9 @@ def imprimir_resultados(potencia_kw, capacidad_kwh, precio_usd, tipo_cambio,
     print('  ' + '=' * 82)
     print(f'\n  RESUMEN FINAL:')
     print(f'  Inversion Inicial:                   ${inversion_mxn:>15,.2f} MXN')
+    print(f'  Ahorro Capacidad Anual (PUNTA):      ${total_ahorro_cap:>15,.2f} MXN')
+    print(f'  Costo Carga BESS Anual (BASE):      -${total_costo_carga:>15,.2f} MXN')
+    print(f'  Ahorro Neto Anual:                   ${total_ahorro_neto:>15,.2f} MXN')
     print(f'  Ahorro Total en {anios} anos:            ${ahorro_total_vida_util:>15,.2f} MXN')
     if roi_exacto:
         print(f'  Retorno de Inversion:                {roi_exacto} anos')
@@ -349,7 +467,7 @@ def imprimir_resultados(potencia_kw, capacidad_kwh, precio_usd, tipo_cambio,
 # ─────────────────────────────────────────────────────────────────────────────
 # EXPORTAR CSVs
 # ─────────────────────────────────────────────────────────────────────────────
-def exportar_csvs(comparativo_df, tabla_inv_df):
+def exportar_csvs(comparativo_df, tabla_inv_df, sim_df=None):
     """Guarda las tablas de resultados en archivos CSV."""
     try:
         comparativo_df.to_csv('COMPARATIVO_RECIBOS.csv', index=False, encoding='utf-8')
@@ -362,6 +480,13 @@ def exportar_csvs(comparativo_df, tabla_inv_df):
         print(f'  [OK] Tabla de inversion guardada en:  INVERSION_CAPITAL.csv')
     except Exception as e:
         print(f'  [!!] Error al guardar inversion: {e}')
+
+    if sim_df is not None:
+        try:
+            sim_df.to_csv('SIMULACION_BESS_CAPACIDAD.csv', index=False, encoding='utf-8-sig')
+            print(f'  [OK] Simulacion BESS guardada en:     SIMULACION_BESS_CAPACIDAD.csv')
+        except Exception as e:
+            print(f'  [!!] Error al guardar simulacion: {e}')
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -388,11 +513,29 @@ def main():
         print('  Ejecute primero calcular_capacidad.py')
         sys.exit(1)
 
-    # 3. Ejecutar simulación BESS
+    # 2b. Cargar datos de consumos y tarifas para calculo de carga BASE
+    try:
+        consumos_df, tarifas_df, estado, municipio = cargar_datos_consumo_y_tarifas()
+        consumo_base_map = construir_consumo_base_por_periodo(consumos_df)
+        print(f'  [OK] Consumos y tarifas cargados ({estado} - {municipio})')
+    except Exception as e:
+        print(f'  [!!] No se pudieron cargar consumos/tarifas: {e}')
+        tarifas_df, estado, municipio, consumo_base_map = None, None, None, None
+
+    # 3. Ejecutar simulación BESS (capacidad + carga BASE)
     print('  Ejecutando simulacion BESS...')
-    sim_df = ejecutar_simulacion_bess(potencia_kw, capacidad_kwh, cargos_df)
-    ahorro_anual = sim_df['Ahorro'].sum()
-    print(f'  [OK] Simulacion completada | Ahorro anual: ${ahorro_anual:,.2f} MXN')
+    sim_df = ejecutar_simulacion_bess(
+        potencia_kw, capacidad_kwh, cargos_df,
+        tarifas_df=tarifas_df, estado=estado, municipio=municipio,
+        consumo_base_map=consumo_base_map
+    )
+    ahorro_capacidad = sim_df['Ahorro_Capacidad'].sum()
+    costo_carga_total = sim_df['Costo_Carga_BASE'].sum()
+    ahorro_anual = sim_df['Ahorro_Neto'].sum()
+    print(f'  [OK] Simulacion completada')
+    print(f'       Ahorro capacidad (PUNTA):  ${ahorro_capacidad:,.2f} MXN')
+    print(f'       Costo carga BESS (BASE):  -${costo_carga_total:,.2f} MXN')
+    print(f'       Ahorro neto anual:         ${ahorro_anual:,.2f} MXN')
 
     # 4. Generar comparativo mensual
     comparativo_df = generar_comparativo_mensual(sim_df)
@@ -416,7 +559,7 @@ def main():
     )
 
     # 8. Exportar CSVs
-    exportar_csvs(comparativo_df, tabla_inv_df)
+    exportar_csvs(comparativo_df, tabla_inv_df, sim_df)
 
     print('\n' + '#' * 90)
     print('#' + '  REPORTE GENERADO EXITOSAMENTE'.center(88) + '#')
