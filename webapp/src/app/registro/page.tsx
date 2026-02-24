@@ -34,12 +34,8 @@ export default function RegistroPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-brand-950 to-slate-900 px-4 relative overflow-hidden">
-      {/* Animated background blobs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden>
-        <div className="blob-1 absolute -top-1/4 -left-1/4 w-[70%] h-[70%] rounded-full bg-orange-500/[0.07] blur-[100px]" />
-        <div className="blob-2 absolute -bottom-1/4 -right-1/4 w-[60%] h-[60%] rounded-full bg-blue-500/[0.06] blur-[120px]" />
-        <div className="blob-3 absolute top-1/3 left-1/2 w-[50%] h-[50%] rounded-full bg-brand-500/[0.05] blur-[100px]" />
-      </div>
+      {/* Aurora animated background */}
+      <div className="absolute inset-0 bg-aurora pointer-events-none" aria-hidden />
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
