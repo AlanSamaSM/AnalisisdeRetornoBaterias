@@ -48,20 +48,32 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 });
   }
 
+  // Input validation — cap string lengths and validate numeric ranges
+  const safeName = String(nombre).substring(0, 200);
+  const safeCliente = String(cliente || '').substring(0, 200);
+  const safeEstado = String(estado || '').substring(0, 100);
+  const safeMunicipio = String(municipio || '').substring(0, 100);
+  const safeRegion = ['NORTE', 'CENTRAL', 'BAJA CALIFORNIA SUR'].includes(region) ? region : 'NORTE';
+
+  const numVal = (v: any, min: number, max: number, fallback: number) => {
+    const n = Number(v);
+    return isNaN(n) || n < min || n > max ? fallback : n;
+  };
+
   const proyecto = await prisma.proyecto.create({
     data: {
-      nombre,
-      cliente: cliente || '',
-      estado: estado || '',
-      municipio: municipio || '',
-      region: region || 'NORTE',
-      potenciaKw: potenciaKw || 0,
-      capacidadKwh: capacidadKwh || 0,
-      precioUsd: precioUsd || 0,
-      tipoCambio: tipoCambio || 18.5,
-      aniosProyeccion: aniosProyeccion || 15,
-      eficiencia: eficiencia || 0.9,
-      horasCargaBase: horasCargaBase || 6,
+      nombre: safeName,
+      cliente: safeCliente,
+      estado: safeEstado,
+      municipio: safeMunicipio,
+      region: safeRegion,
+      potenciaKw: numVal(potenciaKw, 0, 100000, 0),
+      capacidadKwh: numVal(capacidadKwh, 0, 1000000, 0),
+      precioUsd: numVal(precioUsd, 0, 10000000, 0),
+      tipoCambio: numVal(tipoCambio, 1, 100, 18.5),
+      aniosProyeccion: numVal(aniosProyeccion, 1, 50, 15),
+      eficiencia: numVal(eficiencia, 0.01, 1, 0.9),
+      horasCargaBase: numVal(horasCargaBase, 1, 24, 6),
       userId,
     },
   });

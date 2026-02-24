@@ -2,6 +2,12 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
+// Safety guard: never seed weak credentials into production
+if (process.env.NODE_ENV === 'production') {
+  console.log('\u26a0\ufe0f Seed script skipped in production. Create users via the /registro endpoint.');
+  process.exit(0);
+}
+
 const prisma = new PrismaClient();
 
 async function main() {

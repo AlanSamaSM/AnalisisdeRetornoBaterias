@@ -84,6 +84,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No se enviaron archivos PDF' }, { status: 400 });
     }
 
+    // ─── Upload validation (security) ────────────────────────────────────────
+    const MAX_FILES = 14;
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB per file
+    const PDF_MAGIC = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF
+
+    if (files.length > MAX_FILES) {
+      return NextResponse.json({ error: `Máximo ${MAX_FILES} archivos permitidos` }, { status: 400 });
+    }
+
+    for (const f of files) {
+      if (f.size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: `${f.name} excede el límite de 10 MB` },
+          { status: 400 },
+        );
+      }
+      if (f.type && f.type !== 'application/pdf') {
+        return NextResponse.json(
+          { error: `${f.name}: tipo de archivo no permitido` },
+          { status: 400 },
+        );
+      }
+      const header = Buffer.from(await f.slice(0, 4).arrayBuffer());
+      if (!header.subarray(0, 4).equals(PDF_MAGIC)) {
+        return NextResponse.json(
+          { error: `${f.name}: no es un archivo PDF válido` },
+          { status: 400 },
+        );
+      }
+    }
+
     log.log(`Archivos PDF recibidos: ${files.length}`);
 
     const allParsed: any[] = [];
@@ -271,7 +302,9 @@ export async function POST(req: NextRequest) {
           log.log('Resultados guardados en DB');
         } catch (modelErr: any) {
           log.error(`Error en modelo financiero: ${modelErr.message}`);
-          log.error(`Stack: ${modelErr.stack?.substring(0, 500)}`);
+          if (process.env.NODE_ENV !== 'production') {
+            log.error(`Stack: ${modelErr.stack?.substring(0, 500)}`);
+          }
           errores.push(`Modelo financiero: ${modelErr.message}`);
         }
       } else {
@@ -288,13 +321,18 @@ export async function POST(req: NextRequest) {
       recibos: allParsed.length,
       errores,
       resultadoFinanciero,
-      log: log.getEntries(),
+      ...(process.env.NODE_ENV !== 'production' ? { log: log.getEntries() } : {}),
     });
   } catch (err: any) {
     log.error(`Error fatal: ${err.message}`);
     console.error('Error en analizar:', err);
     return NextResponse.json(
-      { error: err.message || 'Error interno', log: log.getEntries() },
+      {
+        error: process.env.NODE_ENV === 'production'
+          ? 'Error interno del servidor'
+          : (err.message || 'Error interno'),
+        ...(process.env.NODE_ENV !== 'production' ? { log: log.getEntries() } : {}),
+      },
       { status: 500 },
     );
   }
