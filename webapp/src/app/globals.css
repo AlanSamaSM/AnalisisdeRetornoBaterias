@@ -22,3 +22,24 @@ body {
 /* Number formatting */
 .num-positive { color: #16a34a; }
 .num-negative { color: #dc2626; }
+
+/* ─── Animated wave background ─── */
+@keyframes wave-drift {
+  0%   { transform: translateX(0)   translateY(0); }
+  50%  { transform: translateX(-25%) translateY(8px); }
+  100% { transform: translateX(0)   translateY(0); }
+}
+@keyframes wave-drift-reverse {
+  0%   { transform: translateX(0)   translateY(0); }
+  50%  { transform: translateX(20%) translateY(-6px); }
+  100% { transform: translateX(0)   translateY(0); }
+}
+@keyframes wave-drift-slow {
+  0%   { transform: translateX(0)   translateY(0); }
+  50%  { transform: translateX(-15%) translateY(12px); }
+  100% { transform: translateX(0)   translateY(0); }
+}
+
+.wave-1 { animation: wave-drift        20s ease-in-out infinite; }
+.wave-2 { animation: wave-drift-reverse 25s ease-in-out infinite; }
+.wave-3 { animation: wave-drift-slow    30s ease-in-out infinite; }
