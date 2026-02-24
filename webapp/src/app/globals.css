@@ -24,22 +24,22 @@ body {
 .num-negative { color: #dc2626; }
 
 /* ─── Animated wave background ─── */
-@keyframes wave-drift {
-  0%   { transform: translateX(0)   translateY(0); }
-  50%  { transform: translateX(-25%) translateY(8px); }
-  100% { transform: translateX(0)   translateY(0); }
+@keyframes blob-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(30px, -40px) scale(1.05); }
+  66%      { transform: translate(-20px, 20px) scale(0.95); }
 }
-@keyframes wave-drift-reverse {
-  0%   { transform: translateX(0)   translateY(0); }
-  50%  { transform: translateX(20%) translateY(-6px); }
-  100% { transform: translateX(0)   translateY(0); }
+@keyframes blob-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(-40px, 30px) scale(1.08); }
+  66%      { transform: translate(25px, -15px) scale(0.92); }
 }
-@keyframes wave-drift-slow {
-  0%   { transform: translateX(0)   translateY(0); }
-  50%  { transform: translateX(-15%) translateY(12px); }
-  100% { transform: translateX(0)   translateY(0); }
+@keyframes blob-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(20px, 25px) scale(0.97); }
+  66%      { transform: translate(-30px, -30px) scale(1.03); }
 }
 
-.wave-1 { animation: wave-drift        20s ease-in-out infinite; }
-.wave-2 { animation: wave-drift-reverse 25s ease-in-out infinite; }
-.wave-3 { animation: wave-drift-slow    30s ease-in-out infinite; }
+.blob-1 { animation: blob-float-1 20s ease-in-out infinite; }
+.blob-2 { animation: blob-float-2 25s ease-in-out infinite; }
+.blob-3 { animation: blob-float-3 30s ease-in-out infinite; }
