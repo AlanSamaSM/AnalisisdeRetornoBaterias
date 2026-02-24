@@ -27,7 +27,6 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
-  output: 'standalone',
   experimental: {
     serverComponentsExternalPackages: ['pdfjs-dist', 'bcryptjs'],
   },

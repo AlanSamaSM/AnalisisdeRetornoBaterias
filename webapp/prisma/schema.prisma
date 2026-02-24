@@ -1,12 +1,12 @@
 // ─── Prisma Schema - BESS Analyzer ───
-// MySQL database for Hostinger shared hosting
+// PostgreSQL (Neon serverless) for Vercel deployment
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -30,7 +30,7 @@ model Proyecto {
   municipio String   @default("")
   region    String   @default("NORTE")
   tarifa    String   @default("GDMTH")
-  notas     String?  @db.Text
+  notas     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -46,8 +46,8 @@ model Proyecto {
   eficiencia     Float    @default(0.90)
   horasCargaBase Int      @default(6)
 
-  // Resultados calculados (JSON serializado)
-  resultadosJson String? @db.LongText
+  // Resultados calculados (JSON serializado) - PostgreSQL TEXT no tiene límite de tamaño
+  resultadosJson String?
 
   recibos Recibo[]
 }
