@@ -840,11 +840,17 @@ export function toReciboData(parsed: ParsedRecibo): ReciboData {
  * This avoids the pdf-parse "Object.defineProperty" bug with Next.js bundler.
  */
 export async function extraerTextoPdf(buffer: Buffer): Promise<string> {
-  // Use dynamic require to avoid webpack bundling issues with pdfjs-dist worker
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  // Use require (CJS) to avoid ESM worker import chain issues on Vercel serverless.
+  // The ESM pdf.mjs tries to dynamically import pdf.worker.mjs which fails in
+  // serverless environments. The CJS build handles worker loading differently.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+
+  // Disable the worker — not needed in Node.js server environment
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
   const uint8 = new Uint8Array(buffer);
-  const doc = await pdfjsLib.getDocument({ data: uint8, useSystemFonts: true }).promise;
+  const doc = await pdfjsLib.getDocument({ data: uint8, useSystemFonts: true, disableWorker: true }).promise;
 
   let fullText = '';
   for (let i = 1; i <= doc.numPages; i++) {

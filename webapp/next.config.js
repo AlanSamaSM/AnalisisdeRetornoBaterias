@@ -29,6 +29,9 @@ const securityHeaders = [
 const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['pdfjs-dist', 'bcryptjs'],
+    outputFileTracingIncludes: {
+      '/api/analizar': ['./node_modules/pdfjs-dist/**/*'],
+    },
   },
   env: {
     NEXT_TELEMETRY_DISABLED: '1',
@@ -47,6 +50,9 @@ const nextConfig = {
       config.externals = config.externals || [];
       config.externals.push({
         'pdfjs-dist/legacy/build/pdf.mjs': 'commonjs pdfjs-dist/legacy/build/pdf.mjs',
+        'pdfjs-dist/legacy/build/pdf.worker.mjs': 'commonjs pdfjs-dist/legacy/build/pdf.worker.mjs',
+        'pdfjs-dist/legacy/build/pdf.js': 'commonjs pdfjs-dist/legacy/build/pdf.js',
+        'pdfjs-dist/legacy/build/pdf.worker.js': 'commonjs pdfjs-dist/legacy/build/pdf.worker.js',
       });
     }
     return config;
