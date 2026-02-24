@@ -45,9 +45,25 @@ export async function PATCH(
   }
 
   const body = await req.json();
+
+  // Whitelist: only allow updating these fields to prevent overwriting protected ones
+  const ALLOWED_FIELDS = [
+    'nombre', 'cliente', 'estado', 'municipio', 'region', 'tarifa', 'notas',
+    'potenciaKw', 'capacidadKwh', 'precioUsd', 'tipoCambio',
+    'aniosProyeccion', 'eficiencia', 'horasCargaBase',
+  ] as const;
+
+  const safeData = Object.fromEntries(
+    Object.entries(body).filter(([key]) => ALLOWED_FIELDS.includes(key as any)),
+  );
+
+  if (Object.keys(safeData).length === 0) {
+    return NextResponse.json({ error: 'Sin campos válidos para actualizar' }, { status: 400 });
+  }
+
   const proyecto = await prisma.proyecto.update({
     where: { id: params.id },
-    data: body,
+    data: safeData,
   });
 
   return NextResponse.json(proyecto);

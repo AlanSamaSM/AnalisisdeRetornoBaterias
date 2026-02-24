@@ -1,12 +1,12 @@
 // ─── Prisma Schema - BESS Analyzer ───
-// SQLite database for Hostinger shared hosting
+// MySQL database for Hostinger shared hosting
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -30,7 +30,7 @@ model Proyecto {
   municipio String   @default("")
   region    String   @default("NORTE")
   tarifa    String   @default("GDMTH")
-  notas     String?
+  notas     String?  @db.Text
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -47,7 +47,7 @@ model Proyecto {
   horasCargaBase Int      @default(6)
 
   // Resultados calculados (JSON serializado)
-  resultadosJson String?
+  resultadosJson String? @db.LongText
 
   recibos Recibo[]
 }

@@ -14,6 +14,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(String(email).toLowerCase())) {
+      return NextResponse.json(
+        { error: 'Formato de email inválido' },
+        { status: 400 },
+      );
+    }
+
+    if (String(password).length < 8) {
+      return NextResponse.json(
+        { error: 'La contraseña debe tener al menos 8 caracteres' },
+        { status: 400 },
+      );
+    }
+
+    if (String(name).trim().length < 2) {
+      return NextResponse.json(
+        { error: 'El nombre debe tener al menos 2 caracteres' },
+        { status: 400 },
+      );
+    }
+
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
       return NextResponse.json(
