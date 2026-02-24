@@ -1,0 +1,83 @@
+// ─── Prisma Schema - BESS Analyzer ───
+// SQLite database for Hostinger shared hosting
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  empresa   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proyectos Proyecto[]
+}
+
+model Proyecto {
+  id        String   @id @default(cuid())
+  nombre    String
+  cliente   String?
+  estado    String   @default("")
+  municipio String   @default("")
+  region    String   @default("NORTE")
+  tarifa    String   @default("GDMTH")
+  notas     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Parámetros BESS
+  potenciaKw     Float    @default(0)
+  capacidadKwh   Float    @default(0)
+  precioUsd      Float    @default(0)
+  tipoCambio     Float    @default(18.50)
+  aniosProyeccion Int     @default(15)
+  eficiencia     Float    @default(0.90)
+  horasCargaBase Int      @default(6)
+
+  // Resultados calculados (JSON serializado)
+  resultadosJson String?
+
+  recibos Recibo[]
+}
+
+model Recibo {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  proyectoId String
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+
+  archivoNombre String
+  anio          Int
+  mes           String
+  mesNum        Int
+  dias          Int
+  temporada     String
+
+  consumoPunta      Float @default(0)
+  consumoIntermedia Float @default(0)
+  consumoBase       Float @default(0)
+  totalConsumo      Float @default(0)
+
+  demandaPunta      Float @default(0)
+  demandaIntermedia Float @default(0)
+  demandaBase       Float @default(0)
+  demandaMaxima     Float @default(0)
+
+  factorCarga    Float @default(0)
+  factorPotencia Float @default(0)
+
+  @@unique([proyectoId, mes, anio])
+}
