@@ -30,6 +30,9 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['pdfjs-dist', 'bcryptjs'],
   },
+  env: {
+    NEXT_TELEMETRY_DISABLED: '1',
+  },
   async headers() {
     return [
       {
