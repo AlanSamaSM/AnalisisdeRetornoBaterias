@@ -1,0 +1,55 @@
+[2026-02-23 22:17:28] INICIANDO ORQUESTADOR BESS
+[2026-02-23 22:17:28] Configuración PUNTA: power=100kW, capacity=400kWh
+[2026-02-23 22:17:28] Configuración INVIERNO: power=120kW, capacity=500kWh
+[2026-02-23 22:17:28] 
+====================================================================================================
+[2026-02-23 22:17:28] INICIANDO VALIDACIÓN DE DATOS
+[2026-02-23 22:17:28] ====================================================================================================
+[2026-02-23 22:17:28] [OK] Todos los archivos de datos encontrados.
+[2026-02-23 22:17:28] 
+====================================================================================================
+[2026-02-23 22:17:28] EJECUTANDO HORARIO: PUNTA
+[2026-02-23 22:17:28] ====================================================================================================
+[2026-02-23 22:17:28] 
+[1/3] Iniciando calcular_capacidad (PUNTA)...
+[2026-02-23 22:17:28] [✓] calcular_capacidad completado en 0.07s
+[2026-02-23 22:17:28] 
+[2/3] Iniciando simulador_bess (PUNTA)...
+[2026-02-23 22:17:28] [✓] simulador_bess completado en 0.01s
+[2026-02-23 22:17:28] 
+[3/3] Iniciando modelo_financiero (PUNTA)...
+[2026-02-23 22:17:28] [✓] modelo_financiero completado en 0.09s
+[2026-02-23 22:17:28] 
+[✓] HORARIO PUNTA: COMPLETADO EXITOSAMENTE
+[2026-02-23 22:17:28] 
+====================================================================================================
+[2026-02-23 22:17:28] EJECUTANDO HORARIO: INVIERNO
+[2026-02-23 22:17:28] ====================================================================================================
+[2026-02-23 22:17:28] 
+[1/3] Iniciando calcular_capacidad (INVIERNO)...
+[2026-02-23 22:17:28] [✓] calcular_capacidad completado en 0.05s
+[2026-02-23 22:17:28] 
+[2/3] Iniciando simulador_bess (INVIERNO)...
+[2026-02-23 22:17:28] [✓] simulador_bess completado en 0.01s
+[2026-02-23 22:17:28] 
+[3/3] Iniciando modelo_financiero (INVIERNO)...
+[2026-02-23 22:17:28] [✓] modelo_financiero completado en 0.09s
+[2026-02-23 22:17:28] 
+[✓] HORARIO INVIERNO: COMPLETADO EXITOSAMENTE
+[2026-02-23 22:17:28] 
+====================================================================================================
+[2026-02-23 22:17:28] CONSOLIDANDO RESULTADOS
+[2026-02-23 22:17:28] ====================================================================================================
+[2026-02-23 22:17:28] [✓] Simulación consolidada guardada: SIMULACION_BESS_CONSOLIDADA.csv
+[2026-02-23 22:17:28] [✓] Comparativo consolidado guardado: COMPARATIVO_RECIBOS_CONSOLIDADO.csv
+[2026-02-23 22:17:28] 
+====================================================================================================
+[2026-02-23 22:17:28] RESUMEN DE EJECUCIÓN
+[2026-02-23 22:17:28] ====================================================================================================
+[2026-02-23 22:17:28] Horario PUNTA:   ✓ EXITOSO
+[2026-02-23 22:17:28] Horario INVIERNO: ✓ EXITOSO
+[2026-02-23 22:17:28] Duración total:  0.39 segundos
+[2026-02-23 22:17:28] Directorio de resultados: C:\Users\NorbertAlvarez\OneDrive - DM Solar\Escritorio\Codigo\MODELO FINANCIERO\AnalisisdeRetornoBaterias\resultados
+[2026-02-23 22:17:28] ====================================================================================================
+
+[2026-02-23 22:17:28] ✓ ORQUESTACIÓN COMPLETADA EXITOSAMENTE
