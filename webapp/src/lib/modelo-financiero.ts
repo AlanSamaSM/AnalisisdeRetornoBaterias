@@ -10,7 +10,6 @@ import {
   type CargoCapacidad,
   calcularCargosCapacidad,
   obtenerTarifaBase,
-  obtenerTarifaDistribucion,
 } from './calcular-capacidad';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -136,23 +135,15 @@ export function ejecutarSimulacionBess(
     const dPuntaNueva = resultado.demanda_nueva;
 
     // 5.1 Capacidad: D_fact = min(D_punta, floor(Q/(24*d*FC)))
-    // 5.2 Distribución: D_fact = min(D_max, floor(Q/(24*d*FC)))
-    // dFactPre = floor(Q/(24*d*FC)) is the same for both
     const dFactCapConBess = Math.min(dPuntaNueva, cargo.dFactPre);
-    // D_max doesn't change with BESS (BESS only shaves punta, max could be intermedia)
-    const dFactDistConBess = Math.min(cargo.dMaxima, cargo.dFactPre);
 
-    // ── Cap s/BESS: Capacidad + Distribución sin BESS ──
-    const capSinBess = cargo.cargoCapacidadRecibo > 0
+    // ── Cap s/BESS: solo Capacidad según recibo CFE ──
+    const cargoSinBess = cargo.cargoCapacidadRecibo > 0
       ? cargo.cargoCapacidadRecibo
       : cargo.dFacturable * cargo.tarifaCap;
-    const distSinBess = cargo.dFactDist * cargo.tarifaDist;
-    const cargoSinBess = capSinBess + distSinBess;
 
-    // ── Cap c/BESS: Capacidad + Distribución con BESS  ──
-    const capConBess = dFactCapConBess * cargo.tarifaCap;
-    const distConBess = dFactDistConBess * cargo.tarifaDist;
-    const cargoConBess = capConBess + distConBess;
+    // ── Cap c/BESS: solo Capacidad con BESS ──
+    const cargoConBess = dFactCapConBess * cargo.tarifaCap;
 
     const ahorroCapacidad = cargoSinBess - cargoConBess;
     const ahorroCapPct = cargoSinBess > 0 ? (ahorroCapacidad / cargoSinBess) * 100 : 0;
