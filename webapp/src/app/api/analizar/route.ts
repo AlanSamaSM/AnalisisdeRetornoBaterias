@@ -144,6 +144,7 @@ export async function POST(req: NextRequest) {
           log.log(`    Consumos kWh → Base: ${r.consumoBase} | Inter: ${r.consumoIntermedia} | Punta: ${r.consumoPunta} | Total: ${r.totalConsumo}`);
           log.log(`    Demandas kW  → Base: ${r.demandaBase} | Inter: ${r.demandaIntermedia} | Punta: ${r.demandaPunta} | Max: ${r.demandaMaxima}`);
           log.log(`    Factor carga: ${r.factorCarga}% | Factor potencia: ${r.factorPotencia}% | Días: ${r.dias}`);
+          log.log(`    Cargo capacidad recibo: $${r.cargoCapacidadRecibo || 0}`);
 
           if (r.advertencias.length > 0) {
             log.warn(`    Advertencias: ${r.advertencias.join('; ')}`);
@@ -188,6 +189,7 @@ export async function POST(req: NextRequest) {
           demandaMaxima: parsed.demandaMaxima || 0,
           factorCarga: parsed.factorCarga || 0,
           factorPotencia: parsed.factorPotencia || 0,
+          cargoCapacidadRecibo: parsed.cargoCapacidadRecibo || 0,
         },
       });
     }

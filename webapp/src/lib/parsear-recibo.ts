@@ -295,6 +295,35 @@ function calcularFactorCargaFallback(
   return 0;
 }
 
+/**
+ * Extrae el importe de "Capacidad" ($) de la tabla de costos del recibo CFE.
+ * En la tabla "Costos de la energía en el Mercado Eléctrico Mayorista",
+ * la fila "Capacidad" contiene el cargo real que CFE cobró.
+ * Ejemplo: "Capacidad 0.00 701,815.03 0.00 701,815.03"
+ */
+function extraerCargoCapacidadRecibo(texto: string): number {
+  // Patrón: "Capacidad" seguido de varios valores numéricos separados por espacios
+  // El importe de $/kW es el segundo número (o el Importe MXN es el último)
+  const patrones = [
+    // "Capacidad  0.00  701,815.03  0.00  701,815.03" — tomar el último número
+    /Capacidad\s+[\d,.]+\s+([\d,]+\.\d{2})\s+[\d,.]+\s+([\d,]+\.\d{2})/i,
+    // "Capacidad" seguido de $/kW value
+    /Capacidad\s+[\d,.]+\s+([\d,]+\.\d{2})/i,
+    // Fallback: "Capacidad" con cualquier número grande después
+    /Capacidad[^\n]*?([\d,]+\.\d{2})\s*$/im,
+  ];
+  for (const re of patrones) {
+    const m = texto.match(re);
+    if (m) {
+      // Use the last capture group (Importe MXN)
+      const raw = m[m.length - 1];
+      const val = parseFloat(raw.replace(/,/g, ''));
+      if (val > 100) return Math.round(val * 100) / 100; // sanity: capacity charges are large
+    }
+  }
+  return 0;
+}
+
 function extraerTarifa(texto: string): string {
   const match = texto.match(/TARIFA\s*:\s*(\w+)/i);
   return match ? match[1].toUpperCase() : '';
@@ -652,6 +681,7 @@ export interface ParsedRecibo {
   demandaMaxima: number;
   factorCarga: number;
   factorPotencia: number;
+  cargoCapacidadRecibo: number; // $ importe de Capacidad leído del recibo CFE
   advertencias: string[];
 }
 
@@ -702,6 +732,9 @@ export function parsearRecibo(
   // Factor de potencia
   base.factorPotencia = extraerFactorPotencia(texto);
 
+  // Cargo de capacidad leído directamente del recibo CFE
+  base.cargoCapacidadRecibo = extraerCargoCapacidadRecibo(texto);
+
   // Factor de carga: read from PDF text first; fallback to D_máxima formula
   base.factorCarga =
     extraerFactorCargaPDF(texto) ||
@@ -742,6 +775,15 @@ export function parsearRecibo(
         // We found two sets of data — assign to sub-periodos
         const sub1 = crearSubperiodo(1, dataBlocks[0], dateRanges[0]?.match, base, nombreArchivo);
         const sub2 = crearSubperiodo(2, dataBlocks[1], dateRanges[1]?.match, base, nombreArchivo);
+        // Split cargoCapacidadRecibo proportionally by days
+        const totalDiasSub = sub1.dias + sub2.dias;
+        if (totalDiasSub > 0 && (base.cargoCapacidadRecibo || 0) > 0) {
+          sub1.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * sub1.dias / totalDiasSub) * 100) / 100;
+          sub2.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * sub2.dias / totalDiasSub) * 100) / 100;
+        } else {
+          sub1.cargoCapacidadRecibo = 0;
+          sub2.cargoCapacidadRecibo = 0;
+        }
         return [sub1, sub2];
       } else if (dataBlocks.length === 1) {
         // Only one data block found — try splitting by date ranges
@@ -779,6 +821,17 @@ export function parsearRecibo(
         for (const sub of [sub1, sub2]) {
           sub.factorCarga =
             calcularFactorCargaFallback(sub.totalConsumo, sub.dias, sub.demandaMaxima);
+        }
+
+        // Split cargoCapacidadRecibo proportionally by days
+        if (totalDias > 0 && (base.cargoCapacidadRecibo || 0) > 0) {
+          const r1 = sub1.dias / totalDias;
+          const r2 = sub2.dias / totalDias;
+          sub1.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * r1) * 100) / 100;
+          sub2.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * r2) * 100) / 100;
+        } else {
+          sub1.cargoCapacidadRecibo = 0;
+          sub2.cargoCapacidadRecibo = 0;
         }
 
         return [sub1, sub2];
@@ -859,6 +912,7 @@ export function toReciboData(parsed: ParsedRecibo): ReciboData {
     demandaMaxima: parsed.demandaMaxima,
     factorCarga: parsed.factorCarga,
     factorPotencia: parsed.factorPotencia,
+    cargoCapacidadRecibo: parsed.cargoCapacidadRecibo || 0,
   };
 }
 

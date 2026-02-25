@@ -72,6 +72,7 @@ export function cargarTodasTarifas(): TarifaGDMTH[] {
     const intHorario = cols[9].trim().toUpperCase();
     const monto = parseFloat(cols[10]) || 0;
     const capacidad = parseFloat(cols[16]) || 0;
+    const distribucion = parseFloat(cols[14]) || 0;
 
     const mesNombre = MESES_CSV[mesCsv] || mesCsv;
 
@@ -81,6 +82,7 @@ export function cargarTodasTarifas(): TarifaGDMTH[] {
       mes: mesNombre,
       intHorario,
       capacidad,
+      distribucion,
       monto,
     });
   }

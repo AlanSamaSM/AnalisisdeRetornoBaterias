@@ -20,6 +20,7 @@ export interface ReciboData {
   demandaMaxima: number;
   factorCarga: number;
   factorPotencia: number;
+  cargoCapacidadRecibo: number; // $ importe de Capacidad leído del recibo CFE
 }
 
 export interface TarifaGDMTH {
@@ -27,7 +28,8 @@ export interface TarifaGDMTH {
   municipio: string;
   mes: string;
   intHorario: string; // 'BASE' | 'INTERMEDIA' | 'PUNTA'
-  capacidad: number;  // $/kW
+  capacidad: number;  // $/kW (cargo por capacidad)
+  distribucion: number; // $/kW (cargo por distribución)
   monto: number;      // $/kWh
 }
 
@@ -38,12 +40,17 @@ export interface CargoCapacidad {
   dias: number;
   temporada: string;
   dPunta: number;
+  dMaxima: number;       // demanda máxima mensual
   totalConsumo: number;
   factorCarga: number;
-  dFactPre: number;      // piso de facturación por fórmula
-  dFacturable: number;   // min(D_punta, dFactPre)
-  tarifaCap: number;     // $/kW
-  cargoCapacidad: number; // $
+  dFactPre: number;      // piso de facturación por fórmula: floor(Q/(24*d*FC))
+  dFacturable: number;   // min(D_punta, dFactPre) para Capacidad
+  dFactDist: number;     // min(D_maxima, dFactPre) para Distribución
+  tarifaCap: number;     // $/kW capacidad
+  tarifaDist: number;    // $/kW distribución
+  cargoCapacidad: number; // $ (calculado)
+  cargoDist: number;     // $ distribución (calculado)
+  cargoCapacidadRecibo: number; // $ leído del recibo CFE
 }
 
 /** Limpia un string numérico con comas y espacios */
@@ -89,6 +96,39 @@ export function obtenerTarifaCapacidad(
   }
 
   return fila ? fila.capacidad : 0;
+}
+
+/**
+ * Obtiene la tarifa de distribución ($/kW) para un mes dado.
+ * Usa el horario PUNTA (donde está el dato de distribución en la fila).
+ */
+export function obtenerTarifaDistribucion(
+  tarifas: TarifaGDMTH[],
+  estado: string,
+  municipio: string,
+  mes: string,
+): number {
+  const mesUp = mes.trim().toUpperCase();
+  const estadoUp = estado.trim().toUpperCase();
+  const munUp = municipio.trim().toUpperCase();
+
+  let fila = tarifas.find(
+    (t) =>
+      t.estado.trim().toUpperCase() === estadoUp &&
+      t.municipio.trim().toUpperCase() === munUp &&
+      t.mes.trim().toUpperCase() === mesUp &&
+      t.intHorario.trim().toUpperCase() === 'PUNTA',
+  );
+
+  if (!fila) {
+    fila = tarifas.find(
+      (t) =>
+        t.mes.trim().toUpperCase() === mesUp &&
+        t.intHorario.trim().toUpperCase() === 'PUNTA',
+    );
+  }
+
+  return fila ? fila.distribucion : 0;
 }
 
 /**
@@ -145,6 +185,7 @@ export function calcularCargosCapacidad(
   return recibos.map((r) => {
     const mesTarifa = MESES_MAP[r.mesNum] || r.mes.toUpperCase();
     const tarifaCap = obtenerTarifaCapacidad(tarifas, estado, municipio, mesTarifa);
+    const tarifaDist = obtenerTarifaDistribucion(tarifas, estado, municipio, mesTarifa);
 
     // Factor de carga como decimal (viene como %)
     const fc = r.factorCarga / 100;
@@ -155,9 +196,13 @@ export function calcularCargosCapacidad(
       dFactPre = Math.floor(r.totalConsumo / (24 * r.dias * fc));
     }
 
-    // D_facturable = min(D_punta, piso_formula)
+    // 5.1 Capacidad: D_facturable = min(D_punta, dFactPre)
     const dFacturable = Math.min(r.demandaPunta, dFactPre);
     const cargoCapacidad = dFacturable * tarifaCap;
+
+    // 5.2 Distribución: D_facturable_dist = min(D_maxima, dFactPre)
+    const dFactDist = Math.min(r.demandaMaxima, dFactPre);
+    const cargoDist = dFactDist * tarifaDist;
 
     return {
       periodo: r.mes,
@@ -166,12 +211,17 @@ export function calcularCargosCapacidad(
       dias: r.dias,
       temporada: r.temporada,
       dPunta: r.demandaPunta,
+      dMaxima: r.demandaMaxima,
       totalConsumo: r.totalConsumo,
       factorCarga: r.factorCarga,
       dFactPre,
       dFacturable,
+      dFactDist,
       tarifaCap,
+      tarifaDist,
       cargoCapacidad,
+      cargoDist,
+      cargoCapacidadRecibo: r.cargoCapacidadRecibo || 0,
     };
   });
 }

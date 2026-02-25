@@ -78,6 +78,7 @@ model Recibo {
 
   factorCarga    Float @default(0)
   factorPotencia Float @default(0)
+  cargoCapacidadRecibo Float @default(0) // $ importe Capacidad leído del recibo
 
   @@unique([proyectoId, mes, anio])
 }
