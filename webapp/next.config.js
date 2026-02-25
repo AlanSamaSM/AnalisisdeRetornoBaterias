@@ -46,14 +46,9 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Mark pdfjs-dist as external to avoid webpack bundling issues
+      // Mark pdfjs-dist as external so Node.js resolves it at runtime from node_modules
       config.externals = config.externals || [];
-      config.externals.push({
-        'pdfjs-dist/legacy/build/pdf.mjs': 'commonjs pdfjs-dist/legacy/build/pdf.mjs',
-        'pdfjs-dist/legacy/build/pdf.worker.mjs': 'commonjs pdfjs-dist/legacy/build/pdf.worker.mjs',
-        'pdfjs-dist/legacy/build/pdf.js': 'commonjs pdfjs-dist/legacy/build/pdf.js',
-        'pdfjs-dist/legacy/build/pdf.worker.js': 'commonjs pdfjs-dist/legacy/build/pdf.worker.js',
-      });
+      config.externals.push(/^pdfjs-dist(\/.*)?$/);
     }
     return config;
   },
