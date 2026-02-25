@@ -259,6 +259,42 @@ function extraerFactorPotencia(texto: string): number {
   return match ? parseFloat(match[1]) : 0;
 }
 
+/**
+ * Extrae el Factor de Carga (%) directamente del texto del recibo CFE.
+ * CFE lo imprime como "Factor de Carga XX.XX" o "F.C. XX.XX".
+ * Retorna 0 si no se encuentra.
+ */
+function extraerFactorCargaPDF(texto: string): number {
+  const patrones = [
+    /Factor\s+de\s+[Cc]arga\s*%?\s*[:\s]\s*([\d.]+)/i,
+    /F\.?C\.?\s+([\d.]+)%/i,
+    /Factor\s+[Cc]arga\s*%?\s*[:\s]\s*([\d.]+)/i,
+  ];
+  for (const re of patrones) {
+    const m = texto.match(re);
+    if (m) {
+      const v = parseFloat(m[1]);
+      if (v > 0 && v <= 100) return Math.round(v * 100) / 100;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Calcula FC como fallback usando D_máxima (igual que calcular_capacidad.py).
+ * FC = Q / (24 * d * D_máxima) expresado en %.
+ */
+function calcularFactorCargaFallback(
+  totalConsumo: number,
+  dias: number,
+  demandaMaxima: number,
+): number {
+  if (demandaMaxima > 0 && dias > 0) {
+    return Math.round((totalConsumo / (24 * dias * demandaMaxima)) * 100 * 100) / 100;
+  }
+  return 0;
+}
+
 function extraerTarifa(texto: string): string {
   const match = texto.match(/TARIFA\s*:\s*(\w+)/i);
   return match ? match[1].toUpperCase() : '';
@@ -417,14 +453,12 @@ function crearSubperiodo(
   resultado.demandaPunta = data.demandaPunta;
   resultado.demandaMaxima = Math.max(data.demandaPunta, data.demandaIntermedia, data.demandaBase);
 
-  // Factor de carga
-  if (resultado.demandaPunta > 0 && resultado.dias > 0) {
-    resultado.factorCarga = Math.round(
-      (resultado.totalConsumo / (24 * resultado.dias * resultado.demandaPunta)) * 100 * 100,
-    ) / 100;
-  } else {
-    resultado.factorCarga = 0;
-  }
+  // Factor de carga: fallback to D_máxima formula (no texto available in this scope)
+  resultado.factorCarga = calcularFactorCargaFallback(
+    resultado.totalConsumo,
+    resultado.dias,
+    resultado.demandaMaxima,
+  );
 
   return resultado;
 }
@@ -588,14 +622,10 @@ function parsearBloqueSubperiodo(
     ? parseFloat(fpMatch[1])
     : datosComunes.factorPotencia || 0;
 
-  // Factor de carga (calculado con demanda punta)
-  if (resultado.demandaPunta > 0 && resultado.dias > 0) {
-    resultado.factorCarga = Math.round(
-      (resultado.totalConsumo / (24 * resultado.dias * resultado.demandaPunta)) * 100 * 100,
-    ) / 100;
-  } else {
-    resultado.factorCarga = 0;
-  }
+  // Factor de carga: read from PDF text first; fallback to D_máxima formula
+  resultado.factorCarga =
+    extraerFactorCargaPDF(bloque) ||
+    calcularFactorCargaFallback(resultado.totalConsumo, resultado.dias, resultado.demandaMaxima);
 
   return resultado;
 }
@@ -672,14 +702,14 @@ export function parsearRecibo(
   // Factor de potencia
   base.factorPotencia = extraerFactorPotencia(texto);
 
-  // Factor de carga (calculated using demanda punta, NOT demanda maxima)
-  if ((base.demandaPunta || 0) > 0 && (base.dias || 0) > 0) {
-    base.factorCarga = Math.round(
-      ((base.totalConsumo || 0) / (24 * base.dias! * base.demandaPunta!)) * 100 * 100,
-    ) / 100;
-  } else {
-    base.factorCarga = 0;
-  }
+  // Factor de carga: read from PDF text first; fallback to D_máxima formula
+  base.factorCarga =
+    extraerFactorCargaPDF(texto) ||
+    calcularFactorCargaFallback(
+      base.totalConsumo || 0,
+      base.dias || 0,
+      base.demandaMaxima || 0,
+    );
 
   // ── Sub-periodos (Abril / Octubre) ──
   if (tieneSubperiodos(texto)) {
@@ -745,13 +775,10 @@ export function parsearRecibo(
           sub2.demandaMaxima = base.demandaMaxima || 0;
         }
 
-        // Recalculate factor de carga for each sub
+        // Recalculate factor de carga for each sub using D_máxima formula
         for (const sub of [sub1, sub2]) {
-          if (sub.demandaPunta > 0 && sub.dias > 0) {
-            sub.factorCarga = Math.round(
-              (sub.totalConsumo / (24 * sub.dias * sub.demandaPunta)) * 100 * 100,
-            ) / 100;
-          }
+          sub.factorCarga =
+            calcularFactorCargaFallback(sub.totalConsumo, sub.dias, sub.demandaMaxima);
         }
 
         return [sub1, sub2];
