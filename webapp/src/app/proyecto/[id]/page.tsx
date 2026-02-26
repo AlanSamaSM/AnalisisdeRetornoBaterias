@@ -139,6 +139,59 @@ export default function ProyectoPage() {
     setUploading(false);
   };
 
+  // Download CSV of parsed receipts
+  const handleDescargarCSV = () => {
+    if (!proyecto?.recibos || proyecto.recibos.length === 0) return;
+
+    const headers = [
+      'Estado', 'Municipio', 'Año', 'Mes', 'Días',
+      'Horario (Invierno/Verano)',
+      'Consumo punta', 'Unidades', 'Consumo intermedio', 'Unidades',
+      'Consumo base', 'Unidades', 'Total de consumo', 'Unidades',
+      'Demanda Punta', 'Unidades', 'Demanda Intermedia', 'Unidades',
+      'Demanda base', 'Unidades', 'Demanda Maxima', 'Unidades',
+      'Factor de carga', 'Unidades',
+    ];
+
+    const fmtNum = (n: number) =>
+      n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    const rows = proyecto.recibos.map((r: Recibo) => [
+      proyecto.estado || '',
+      proyecto.municipio || '',
+      r.anio,
+      r.mes,
+      r.dias,
+      r.temporada,
+      `"${fmtNum(r.consumoPunta)}"`, 'kWh',
+      `"${fmtNum(r.consumoIntermedia)}"`, 'kWh',
+      `"${fmtNum(r.consumoBase)}"`, 'kWh',
+      `"${fmtNum(r.totalConsumo)}"`, 'kWh',
+      r.demandaPunta, 'kW',
+      r.demandaIntermedia, 'kW',
+      r.demandaBase, 'kW',
+      r.demandaPunta > r.demandaIntermedia
+        ? r.demandaPunta
+        : r.demandaIntermedia,
+      'kW',
+      r.factorCarga, '%',
+    ]);
+
+    const csvContent =
+      '\uFEFF' +
+      headers.join(',') +
+      '\n' +
+      rows.map((row: any[]) => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${proyecto.nombre.replace(/\s+/g, '_')}_consumos.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Download PDF report
   const handleDescargarPDF = async () => {
     if (!resultados) return;
@@ -299,15 +352,26 @@ export default function ProyectoPage() {
               </p>
             )}
           </div>
-          {resultados && (
-            <button
-              onClick={handleDescargarPDF}
-              className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
-            >
-              <Download className="w-4 h-4" />
-              Descargar PDF
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {proyecto.recibos && proyecto.recibos.length > 0 && (
+              <button
+                onClick={handleDescargarCSV}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Descargar CSV Consumos
+              </button>
+            )}
+            {resultados && (
+              <button
+                onClick={handleDescargarPDF}
+                className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Descargar PDF
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Upload Section */}
