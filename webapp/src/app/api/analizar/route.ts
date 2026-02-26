@@ -165,6 +165,14 @@ export async function POST(req: NextRequest) {
 
     log.log(`=== RESUMEN PARSEO: ${allParsed.length} recibos de ${files.length} archivos, ${errores.length} errores ===`);
 
+    // Sort by year and month (Enero→Diciembre) regardless of upload order
+    allParsed.sort((a: any, b: any) => {
+      const yearDiff = (a.anio || 0) - (b.anio || 0);
+      if (yearDiff !== 0) return yearDiff;
+      return (a.mesNum || 0) - (b.mesNum || 0);
+    });
+    log.log(`Recibos ordenados cronológicamente (Ene→Dic)`);
+
     // Save recibos to database
     await prisma.recibo.deleteMany({ where: { proyectoId } });
     log.log('Recibos anteriores eliminados');
