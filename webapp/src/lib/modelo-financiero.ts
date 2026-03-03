@@ -90,6 +90,27 @@ export interface FilaDegradacion {
   requiereRecompra: boolean;     // true si capacidad < umbral para cubrir punta
 }
 
+export interface EstructuraCostos {
+  costoAnualTotal: number;
+  capacidad: { total: number; pct: number };
+  energiaPunta: { total: number; pct: number };
+  energiaIntermedia: { total: number; pct: number };
+  energiaBase: { total: number; pct: number };
+  distribucion: { total: number; pct: number };
+}
+
+export interface FilaDesplazamiento {
+  periodo: string;
+  consumoBaseOriginal: number;   // kWh
+  consumoBaseNuevo: number;      // kWh (base + carga BESS)
+  consumoPuntaOriginal: number;  // kWh
+  consumoPuntaNuevo: number;     // kWh (punta - descarga BESS)
+  gastoBaseOriginal: number;     // $
+  gastoBaseNuevo: number;        // $ (incluye costo carga BESS)
+  gastoPuntaOriginal: number;    // $
+  gastoPuntaNuevo: number;       // $ (reducido por descarga)
+}
+
 export interface ResultadoFinanciero {
   parametros: ParametrosBESS;
   inversionMxn: number;
@@ -105,6 +126,8 @@ export interface ResultadoFinanciero {
   };
   tablaInversion: FilaInversion[];
   degradacion: FilaDegradacion[];
+  estructuraCostos: EstructuraCostos;
+  desplazamientoCarga: FilaDesplazamiento[];
   roiExacto: number | null;
   ahorroTotalVidaUtil: number;
   anioRecompra: number | null;
@@ -429,6 +452,12 @@ export function ejecutarModeloFinanciero(
   const ultimaDeg = degradacion[degradacion.length - 1];
   const degradacionAcumuladaTotal = ultimaDeg ? ultimaDeg.degradacionPct : 0;
 
+  // 11. Estructura de costos
+  const estructuraCostos = calcularEstructuraCostos(recibos);
+
+  // 12. Desplazamiento de carga
+  const desplazamientoCarga = generarDesplazamientoCarga(simulacion, recibos);
+
   return {
     parametros: params,
     inversionMxn,
@@ -444,11 +473,112 @@ export function ejecutarModeloFinanciero(
     },
     tablaInversion,
     degradacion,
+    estructuraCostos,
+    desplazamientoCarga,
     roiExacto,
     ahorroTotalVidaUtil,
     anioRecompra,
     degradacionAcumuladaTotal,
   };
+}
+
+// ─── Estructura de costos ────────────────────────────────────────────────────
+
+/**
+ * Calcula el desglose de costos anuales a partir de los recibos CFE.
+ * Produce: costo total, y cada componente con su monto y % del total.
+ */
+export function calcularEstructuraCostos(
+  recibos: ReciboData[],
+): EstructuraCostos {
+  const costoAnualTotal = recibos.reduce((s, r) => s + (r.importeTotal || 0), 0);
+  const capacidadTotal = recibos.reduce((s, r) => s + (r.cargoCapacidadRecibo || 0), 0);
+  const puntaTotal = recibos.reduce((s, r) => s + (r.cargoEnergiaPunta || 0), 0);
+  const intermediaTotal = recibos.reduce((s, r) => s + (r.cargoEnergiaIntermedia || 0), 0);
+  const baseTotal = recibos.reduce((s, r) => s + (r.cargoEnergiaBase || 0), 0);
+  const distribucionTotal = recibos.reduce((s, r) => s + (r.cargoDistribucion || 0), 0);
+
+  const pct = (v: number) => costoAnualTotal > 0 ? round2((v / costoAnualTotal) * 100) : 0;
+
+  return {
+    costoAnualTotal: round2(costoAnualTotal),
+    capacidad: { total: round2(capacidadTotal), pct: pct(capacidadTotal) },
+    energiaPunta: { total: round2(puntaTotal), pct: pct(puntaTotal) },
+    energiaIntermedia: { total: round2(intermediaTotal), pct: pct(intermediaTotal) },
+    energiaBase: { total: round2(baseTotal), pct: pct(baseTotal) },
+    distribucion: { total: round2(distribucionTotal), pct: pct(distribucionTotal) },
+  };
+}
+
+// ─── Desplazamiento de carga ─────────────────────────────────────────────────
+
+/**
+ * Genera la tabla de desplazamiento de carga (load shifting) mensual.
+ * Muestra consumos y gastos originales vs. nuevos en base y punta.
+ */
+export function generarDesplazamientoCarga(
+  simulacion: FilaSimulacion[],
+  recibos: ReciboData[],
+): FilaDesplazamiento[] {
+  // Construir mapas de consumo punta y costos por periodo
+  const consumoPuntaMap: Record<string, number> = {};
+  const gastoBaseOrigMap: Record<string, number> = {};
+  const gastoPuntaOrigMap: Record<string, number> = {};
+
+  for (const r of recibos) {
+    const key = r.mes.trim().toUpperCase();
+    consumoPuntaMap[key] = r.consumoPunta;
+    gastoBaseOrigMap[key] = r.cargoEnergiaBase || 0;
+    gastoPuntaOrigMap[key] = r.cargoEnergiaPunta || 0;
+  }
+
+  const filas: FilaDesplazamiento[] = simulacion.map((s) => {
+    const periodoKey = s.periodo.trim().toUpperCase();
+    const consumoPuntaOriginal = consumoPuntaMap[periodoKey] || 0;
+    // La energía descargada del BESS en punta es la misma que la cargada en base
+    const consumoPuntaNuevo = Math.max(0, consumoPuntaOriginal - s.energiaCargaBess);
+
+    const gastoBaseOriginal = gastoBaseOrigMap[periodoKey] || 0;
+    const gastoPuntaOriginal = gastoPuntaOrigMap[periodoKey] || 0;
+
+    // Gasto nuevo en base = gasto original + costo de cargar BESS en base
+    const gastoBaseNuevo = gastoBaseOriginal + s.costoCargaBase;
+    // Gasto nuevo en punta se reduce proporcionalmente al consumo desplazado
+    const factorReduccionPunta = consumoPuntaOriginal > 0
+      ? consumoPuntaNuevo / consumoPuntaOriginal
+      : 1;
+    const gastoPuntaNuevo = round2(gastoPuntaOriginal * factorReduccionPunta);
+
+    return {
+      periodo: s.periodo,
+      consumoBaseOriginal: s.consumoBaseOriginal,
+      consumoBaseNuevo: s.consumoBaseNuevo,
+      consumoPuntaOriginal: round2(consumoPuntaOriginal),
+      consumoPuntaNuevo: round2(consumoPuntaNuevo),
+      gastoBaseOriginal: round2(gastoBaseOriginal),
+      gastoBaseNuevo: round2(gastoBaseNuevo),
+      gastoPuntaOriginal: round2(gastoPuntaOriginal),
+      gastoPuntaNuevo: round2(gastoPuntaNuevo),
+    };
+  });
+
+  // Fila TOTAL
+  const sum = (arr: FilaDesplazamiento[], key: keyof FilaDesplazamiento) =>
+    round2(arr.reduce((s, f) => s + (f[key] as number), 0));
+
+  filas.push({
+    periodo: 'TOTAL ANUAL',
+    consumoBaseOriginal: sum(filas, 'consumoBaseOriginal'),
+    consumoBaseNuevo: sum(filas, 'consumoBaseNuevo'),
+    consumoPuntaOriginal: sum(filas, 'consumoPuntaOriginal'),
+    consumoPuntaNuevo: sum(filas, 'consumoPuntaNuevo'),
+    gastoBaseOriginal: sum(filas, 'gastoBaseOriginal'),
+    gastoBaseNuevo: sum(filas, 'gastoBaseNuevo'),
+    gastoPuntaOriginal: sum(filas, 'gastoPuntaOriginal'),
+    gastoPuntaNuevo: sum(filas, 'gastoPuntaNuevo'),
+  });
+
+  return filas;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
