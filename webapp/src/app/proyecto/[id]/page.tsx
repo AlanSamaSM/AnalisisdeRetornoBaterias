@@ -176,7 +176,7 @@ export default function ProyectoPage() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Title */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 animate-fade-in-up">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
               {proyecto.nombre}
@@ -195,14 +195,14 @@ export default function ProyectoPage() {
               <>
                 <button
                   onClick={handleDescargarExcel}
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm btn-press hover-lift"
                 >
                   <Download className="w-4 h-4" />
                   Reporte Excel
                 </button>
                 <button
                   onClick={handleDescargarPDF}
-                  className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+                  className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm btn-press hover-lift"
                 >
                   <Download className="w-4 h-4" />
                   Reporte PDF
@@ -213,7 +213,7 @@ export default function ProyectoPage() {
         </div>
 
         {/* Upload Section */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8 animate-fade-in-up hover-lift">
           <h2 className="text-lg font-semibold text-slate-800 mb-4">
             Cargar Recibos CFE
           </h2>
@@ -224,7 +224,7 @@ export default function ProyectoPage() {
               <button
                 onClick={handleAnalizar}
                 disabled={uploading}
-                className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60 flex items-center gap-2 text-sm"
+                className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60 flex items-center gap-2 text-sm btn-press"
               >
                 {uploading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -311,7 +311,7 @@ export default function ProyectoPage() {
         {resultados && (
           <>
             {/* KPI Cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8 stagger-children">
               <KPICard
                 label="Ahorro Neto Anual"
                 value={fmtCompact(resultados.totales.ahorroNeto) + ' MXN'}
@@ -343,7 +343,7 @@ export default function ProyectoPage() {
             </div>
 
             {/* Propose summary */}
-            <div className="bg-gradient-to-r from-brand-600 to-brand-800 rounded-2xl p-6 mb-8 text-white">
+            <div className="bg-gradient-to-r from-brand-600 via-brand-700 to-brand-800 rounded-2xl p-6 mb-8 text-white gradient-animate shadow-lg animate-fade-in-up">
               <h3 className="text-lg font-bold mb-4">Propuesta Óptima</h3>
               <div className="grid sm:grid-cols-3 gap-6">
                 <div>
@@ -384,14 +384,14 @@ export default function ProyectoPage() {
                     {fmt(resultados.estructuraCostos.costoAnualTotal)} MXN
                   </span>
                 </p>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
                   {[
                     { label: 'Capacidad',      ...resultados.estructuraCostos.capacidad,          color: 'bg-red-50 border-red-200 text-red-800' },
                     { label: 'Energía Punta',   ...resultados.estructuraCostos.energiaPunta,       color: 'bg-orange-50 border-orange-200 text-orange-800' },
                     { label: 'Energía Intermedia', ...resultados.estructuraCostos.energiaIntermedia, color: 'bg-amber-50 border-amber-200 text-amber-800' },
                     { label: 'Energía Base',    ...resultados.estructuraCostos.energiaBase,        color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
                   ].map((item) => (
-                    <div key={item.label} className={`rounded-xl border p-4 ${item.color}`}>
+                    <div key={item.label} className={`rounded-xl border p-4 hover-lift transition-all duration-300 ${item.color}`}>
                       <p className="text-xs font-medium uppercase tracking-wide opacity-70">
                         {item.label}
                       </p>
@@ -404,7 +404,7 @@ export default function ProyectoPage() {
             )}
 
             {/* Comparativo Table */}
-            <div className="mb-8">
+            <div className="mb-8 animate-fade-in-up">
               <ResultadosTable data={resultados.comparativo} />
             </div>
 
@@ -483,7 +483,7 @@ export default function ProyectoPage() {
             )}
 
             {/* Investment Chart */}
-            <div className="mb-8">
+            <div className="mb-8 animate-fade-in-up">
               <InversionChart
                 data={resultados.tablaInversion}
                 roiExacto={resultados.roiExacto}

@@ -35,13 +35,13 @@ export default function InversionChart({
   }));
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+    <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover-lift transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-slate-800">
           Flujo de Caja — Inversión de Capital
         </h3>
         {roiExacto !== null && (
-          <span className="text-sm bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-medium">
+          <span className="text-sm bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full font-medium border border-emerald-200 animate-scale-in">
             ROI: {roiExacto} años
           </span>
         )}

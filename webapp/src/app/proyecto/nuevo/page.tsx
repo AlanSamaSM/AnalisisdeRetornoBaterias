@@ -23,16 +23,22 @@ function Section({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition text-left"
+        className="w-full flex items-center justify-between px-5 py-3.5 bg-slate-50 hover:bg-slate-100 transition text-left group"
       >
-        <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+        <h2 className="text-sm font-semibold text-slate-700 group-hover:text-brand-600 transition-colors duration-200">{title}</h2>
         <ChevronDown
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+          className={`w-4 h-4 text-slate-400 transition-transform duration-300 ease-bounce-out ${
             open ? 'rotate-180' : ''
           }`}
         />
       </button>
-      {open && <div className="px-5 py-4">{children}</div>}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          open ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+      >
+        <div className="px-5 py-4">{children}</div>
+      </div>
     </section>
   );
 }
@@ -136,7 +142,7 @@ export default function NuevoProyectoPage() {
   };
 
   const inputClass =
-    'w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 outline-none transition text-sm';
+    'w-full px-4 py-2.5 rounded-lg border border-slate-300 hover:border-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-200 focus:shadow-sm outline-none transition-all duration-200 text-sm';
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -148,7 +154,7 @@ export default function NuevoProyectoPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="space-y-4"
+          className="space-y-4 stagger-children"
         >
           {/* General */}
           <Section title="Información General">
@@ -419,14 +425,14 @@ export default function NuevoProyectoPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition text-sm font-medium"
+              className="px-5 py-2.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition text-sm font-medium btn-press"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60 flex items-center gap-2 text-sm"
+              className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60 flex items-center gap-2 text-sm btn-press hover-lift shadow-md hover:shadow-lg"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               Crear Proyecto
