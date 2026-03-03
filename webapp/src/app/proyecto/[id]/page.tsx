@@ -18,6 +18,8 @@ import {
   Download,
   Zap,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { SkeletonPage } from '@/components/Skeleton';
 
 interface Recibo {
   id: string;
@@ -118,11 +120,11 @@ export default function ProyectoPage() {
       }
 
       if (res.ok) {
-        setUploadMsg(
-          `${data.recibos} recibos procesados.${
+        const msg = `${data.recibos} recibos procesados.${
             data.errores?.length ? ` Errores: ${data.errores.join(', ')}` : ''
-          }`,
-        );
+          }`;
+        setUploadMsg(msg);
+        toast.success(msg);
         if (data.resultadoFinanciero) {
           setResultados(data.resultadoFinanciero);
         }
@@ -131,9 +133,11 @@ export default function ProyectoPage() {
         setProyecto(p);
       } else {
         setUploadMsg(`Error: ${data.error}`);
+        toast.error(data.error || 'Error al analizar los recibos');
       }
     } catch (err: any) {
       setUploadMsg(`Error: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
     }
 
     setUploading(false);
@@ -208,8 +212,11 @@ export default function ProyectoPage() {
 
   if (loading || status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SkeletonPage />
+        </main>
       </div>
     );
   }

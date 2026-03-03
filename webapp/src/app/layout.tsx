@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+
+const inter = Inter({ subsets: ['latin'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'DM Solar — Análisis de Retorno BESS',
@@ -14,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className="min-h-screen bg-slate-50">
+    <html lang="es" className={inter.className}>
+      <body className="min-h-screen bg-slate-50 antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

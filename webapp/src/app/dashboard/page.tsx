@@ -5,7 +5,10 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
+import Modal from '@/components/Modal';
+import { SkeletonCard } from '@/components/Skeleton';
 import { Plus, FolderOpen, Calendar, MapPin, Battery, Trash2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Proyecto {
   id: string;
@@ -42,16 +45,38 @@ export default function DashboardPage() {
       .catch(() => setLoading(false));
   }, [status]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Eliminar este proyecto?')) return;
-    await fetch(`/api/proyectos/${id}`, { method: 'DELETE' });
-    setProyectos((prev) => prev.filter((p) => p.id !== id));
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await fetch(`/api/proyectos/${deleteId}`, { method: 'DELETE' });
+      setProyectos((prev) => prev.filter((p) => p.id !== deleteId));
+      toast.success('Proyecto eliminado');
+    } catch {
+      toast.error('Error al eliminar el proyecto');
+    }
+    setDeleteId(null);
   };
 
   if (status === 'loading' || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      <div className="min-h-screen bg-slate-50">
+        <Header />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <div className="space-y-2">
+              <div className="h-7 w-40 bg-slate-200 rounded animate-pulse" />
+              <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+            </div>
+            <div className="h-10 w-36 bg-slate-200 rounded-lg animate-pulse" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        </main>
       </div>
     );
   }
@@ -152,7 +177,7 @@ export default function DashboardPage() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDelete(p.id);
+                        setDeleteId(p.id);
                       }}
                       className="text-slate-400 hover:text-red-500 transition p-1"
                       title="Eliminar proyecto"
@@ -166,6 +191,33 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Eliminar proyecto"
+        footer={
+          <>
+            <button
+              onClick={() => setDeleteId(null)}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmDelete}
+              className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition"
+            >
+              Eliminar
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-600">
+          Esta acción no se puede deshacer. Se eliminarán todos los recibos y resultados asociados al proyecto.
+        </p>
+      </Modal>
     </div>
   );
 }
