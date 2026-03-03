@@ -422,10 +422,117 @@ export default function ProyectoPage() {
               </div>
             </div>
 
+            {/* Estructura de Costos */}
+            {resultados.estructuraCostos && (
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-8">
+                <h3 className="text-lg font-semibold text-slate-800 mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-brand-600" />
+                  Estructura Actual de Costos
+                </h3>
+                <p className="text-sm text-slate-500 mb-5">
+                  Costo eléctrico anual:{' '}
+                  <span className="font-bold text-slate-800">
+                    {fmt(resultados.estructuraCostos.costoAnualTotal)} MXN
+                  </span>
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  {[
+                    { label: 'Capacidad',      ...resultados.estructuraCostos.capacidad,          color: 'bg-red-50 border-red-200 text-red-800' },
+                    { label: 'Energía Punta',   ...resultados.estructuraCostos.energiaPunta,       color: 'bg-orange-50 border-orange-200 text-orange-800' },
+                    { label: 'Energía Intermedia', ...resultados.estructuraCostos.energiaIntermedia, color: 'bg-amber-50 border-amber-200 text-amber-800' },
+                    { label: 'Energía Base',    ...resultados.estructuraCostos.energiaBase,        color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+                    { label: 'Distribución',    ...resultados.estructuraCostos.distribucion,       color: 'bg-blue-50 border-blue-200 text-blue-800' },
+                  ].map((item) => (
+                    <div key={item.label} className={`rounded-xl border p-4 ${item.color}`}>
+                      <p className="text-xs font-medium uppercase tracking-wide opacity-70">
+                        {item.label}
+                      </p>
+                      <p className="text-xl font-bold mt-1">{fmt(item.total)}</p>
+                      <p className="text-sm font-semibold mt-0.5">{item.pct.toFixed(1)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Comparativo Table */}
             <div className="mb-8">
               <ResultadosTable data={resultados.comparativo} />
             </div>
+
+            {/* Desplazamiento de Carga */}
+            {resultados.desplazamientoCarga && resultados.desplazamientoCarga.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-8">
+                <div className="px-6 py-4 border-b border-slate-100">
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    Desplazamiento de Carga (kWh)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Energía desplazada de horario punta a base mediante el sistema BESS
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        <th className="px-4 py-3 font-semibold text-slate-600">Mes</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Base Original</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Base Nuevo</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Punta Original</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Punta Nuevo</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">$ Base Orig.</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">$ Base Nuevo</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">$ Punta Orig.</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">$ Punta Nuevo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {resultados.desplazamientoCarga.map((f: any) => (
+                        <tr key={f.periodo} className="hover:bg-slate-50 transition">
+                          <td className="px-4 py-2.5 font-medium text-slate-700">{f.periodo}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">{f.consumoBaseOriginal.toLocaleString('es-MX')}</td>
+                          <td className="px-4 py-2.5 text-right text-blue-600 font-medium">{f.consumoBaseNuevo.toLocaleString('es-MX')}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">{f.consumoPuntaOriginal.toLocaleString('es-MX')}</td>
+                          <td className="px-4 py-2.5 text-right text-emerald-600 font-medium">{f.consumoPuntaNuevo.toLocaleString('es-MX')}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-500">{fmt(f.gastoBaseOriginal)}</td>
+                          <td className="px-4 py-2.5 text-right text-blue-500">{fmt(f.gastoBaseNuevo)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-500">{fmt(f.gastoPuntaOriginal)}</td>
+                          <td className="px-4 py-2.5 text-right text-emerald-500">{fmt(f.gastoPuntaNuevo)}</td>
+                        </tr>
+                      ))}
+                      {/* TOTAL row */}
+                      <tr className="bg-slate-100 font-semibold">
+                        <td className="px-4 py-2.5 text-slate-800">TOTAL</td>
+                        <td className="px-4 py-2.5 text-right text-slate-700">
+                          {resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.consumoBaseOriginal, 0).toLocaleString('es-MX')}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-blue-700">
+                          {resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.consumoBaseNuevo, 0).toLocaleString('es-MX')}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-700">
+                          {resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.consumoPuntaOriginal, 0).toLocaleString('es-MX')}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-emerald-700">
+                          {resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.consumoPuntaNuevo, 0).toLocaleString('es-MX')}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-600">
+                          {fmt(resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.gastoBaseOriginal, 0))}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-blue-600">
+                          {fmt(resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.gastoBaseNuevo, 0))}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-slate-600">
+                          {fmt(resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.gastoPuntaOriginal, 0))}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-emerald-600">
+                          {fmt(resultados.desplazamientoCarga.reduce((s: number, f: any) => s + f.gastoPuntaNuevo, 0))}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Investment Chart */}
             <div className="mb-8">
@@ -501,6 +608,88 @@ export default function ProyectoPage() {
                 </table>
               </div>
             </div>
+            {/* Degradación del Sistema BESS */}
+            {resultados.degradacion && resultados.degradacion.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-8">
+                <div className="px-6 py-4 border-b border-slate-100">
+                  <h3 className="text-lg font-semibold text-slate-800">
+                    Degradación y Recompra del Sistema BESS
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Proyección de capacidad efectiva y ahorros ajustados por degradación anual
+                    {resultados.anioRecompra && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-amber-600 font-semibold">
+                        — Recompra sugerida: Año {resultados.anioRecompra}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-50 text-left">
+                        <th className="px-4 py-3 font-semibold text-slate-600">Año</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Capacidad Efectiva (kWh)</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Degradación Acumulada</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Factor Capacidad</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-right">Ahorro Ajustado</th>
+                        <th className="px-4 py-3 font-semibold text-slate-600 text-center">Recompra</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {resultados.degradacion.map((d: any) => (
+                        <tr
+                          key={d.anio}
+                          className={`hover:bg-slate-50 transition ${
+                            d.requiereRecompra ? 'bg-amber-50/40' : ''
+                          }`}
+                        >
+                          <td className="px-4 py-2.5 font-medium text-slate-700">{d.anio}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">
+                            {d.capacidadEfectiva.toLocaleString('es-MX', { maximumFractionDigits: 1 })}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">
+                            {d.degradacionPct.toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-600">
+                            {(d.factorCapacidad * 100).toFixed(1)}%
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-emerald-600 font-medium">
+                            {fmt(d.ahorroAjustado)}
+                          </td>
+                          <td className="px-4 py-2.5 text-center">
+                            {d.requiereRecompra ? (
+                              <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                                Sí
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {/* Degradation note */}
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    <strong>Nota:</strong> La degradación es una parte natural del ciclo de vida de las baterías.
+                    Estimamos que con el sistema cotizado se puede garantizar la demanda energética completa
+                    durante <strong>{resultados.anioRecompra ? resultados.anioRecompra - 1 : resultados.parametros.aniosProyeccion}</strong> años.
+                    {resultados.anioRecompra && (
+                      <> En el año <strong>{resultados.anioRecompra}</strong>, la capacidad efectiva ya no cubre
+                      el desplazamiento completo de punta y se recomienda considerar una recompra para
+                      mantener los ahorros originales.</>
+                    )}
+                    Supuesto: {resultados.parametros.tasaDegradacion
+                      ? (resultados.parametros.tasaDegradacion * 100).toFixed(0)
+                      : '2'}% degradación anual,{' '}
+                    {resultados.parametros.ciclosAnuales || 300} ciclos anuales.
+                  </p>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
