@@ -42,6 +42,16 @@ export async function POST(req: NextRequest) {
     aniosProyeccion,
     eficiencia,
     horasCargaBase,
+    marcaBess,
+    modeloBess,
+    tecnologiaBess,
+    vidaUtilAnios,
+    garantiaAnios,
+    capacidadContratada,
+    integrador,
+    preparadoPor,
+    tasaDegradacion,
+    ciclosAnuales,
   } = body;
 
   if (!nombre) {
@@ -54,6 +64,7 @@ export async function POST(req: NextRequest) {
   const safeEstado = String(estado || '').substring(0, 100);
   const safeMunicipio = String(municipio || '').substring(0, 100);
   const safeRegion = ['NORTE', 'CENTRAL', 'BAJA CALIFORNIA SUR'].includes(region) ? region : 'NORTE';
+  const safeTecnologia = ['LFP', 'NMC', 'LTO', 'NaS'].includes(tecnologiaBess) ? tecnologiaBess : 'LFP';
 
   const numVal = (v: any, min: number, max: number, fallback: number) => {
     const n = Number(v);
@@ -74,6 +85,16 @@ export async function POST(req: NextRequest) {
       aniosProyeccion: numVal(aniosProyeccion, 1, 50, 15),
       eficiencia: numVal(eficiencia, 0.01, 1, 0.9),
       horasCargaBase: numVal(horasCargaBase, 1, 24, 6),
+      marcaBess: String(marcaBess || '').substring(0, 100),
+      modeloBess: String(modeloBess || '').substring(0, 100),
+      tecnologiaBess: safeTecnologia,
+      vidaUtilAnios: numVal(vidaUtilAnios, 1, 30, 15),
+      garantiaAnios: numVal(garantiaAnios, 0, 25, 5),
+      capacidadContratada: numVal(capacidadContratada, 0, 100000, 0),
+      integrador: String(integrador || '').substring(0, 200),
+      preparadoPor: String(preparadoPor || '').substring(0, 200),
+      tasaDegradacion: numVal(tasaDegradacion, 0, 0.10, 0.02),
+      ciclosAnuales: numVal(ciclosAnuales, 1, 1000, 300),
       userId,
     },
   });
