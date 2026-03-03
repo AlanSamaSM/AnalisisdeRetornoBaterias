@@ -388,13 +388,13 @@ export function calcularRoiExacto(
  * que fue promediado. Esto evita que meses en blanco distorsionen totales.
  */
 export function rellenarMesesVacios(recibos: ReciboData[]): ReciboData[] {
+  // Solo promediar campos de consumo/demanda/factores para simulación.
+  // Los campos financieros (importeTotal, cargos) se preservan del recibo original
+  // porque representan montos reales facturados, no estimaciones.
   const camposNumericos: (keyof ReciboData)[] = [
     'consumoPunta', 'consumoIntermedia', 'consumoBase', 'totalConsumo',
     'demandaPunta', 'demandaIntermedia', 'demandaBase', 'demandaMaxima',
     'factorCarga', 'factorPotencia',
-    'cargoCapacidadRecibo', 'cargoDistribucion',
-    'cargoEnergiaPunta', 'cargoEnergiaIntermedia', 'cargoEnergiaBase',
-    'importeTotal',
   ];
 
   // Identificar recibos vacíos: totalConsumo === 0 AND todas las demandas === 0
