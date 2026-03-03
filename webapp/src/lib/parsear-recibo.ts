@@ -411,6 +411,12 @@ function extraerCargoEnergiaIntervalo(texto: string, intervalo: string): number 
   // Build patterns for the specific interval
   // CFE MEM table may show: "Energía Base", "Generación Base", "Suministro Base",
   // or just "Base" as a sub-row under an "Energía" / "Suministro" / "Generación" header.
+  // Some PDFs use single-letter abbreviations: "Generación B", "Generación I", "Generación P"
+  const abreviaturas: Record<string, string> = { Base: 'B', Intermedia: 'I', Punta: 'P' };
+  const abrev = abreviaturas[intervalo];
+  // Regex fragment that matches "Base" OR "B" (followed by whitespace)
+  const intervaloRe = abrev ? `(?:${intervalo}|${abrev}(?=\\s))` : intervalo;
+
   const prefijos = [
     `Energ[ií]a\\s+`,
     `Generaci[oó]n\\s+`,
@@ -422,31 +428,30 @@ function extraerCargoEnergiaIntervalo(texto: string, intervalo: string): number 
   for (const pre of prefijos) {
     // "Energía Base  0.00  250,000.00  0.00  250,000.00" → last number
     patrones.push(
-      new RegExp(`${pre}${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+      new RegExp(`${pre}${intervaloRe}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
     );
     // "Energía Base  1.1234  340,968  383,091.14  0.00  383,091.14" (price qty amount IVA total)
     patrones.push(
-      new RegExp(`${pre}${intervalo}\\s+[\\d.]+\\s+[\\d,]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+      new RegExp(`${pre}${intervaloRe}\\s+[\\d.]+\\s+[\\d,]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
     );
     // "Energía Base  250,000.00"
     patrones.push(
-      new RegExp(`${pre}${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+      new RegExp(`${pre}${intervaloRe}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
     );
     // Fallback: line with prefix + interval and number at end of line
     if (pre) {
       patrones.push(
-        new RegExp(`${pre}${intervalo}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
+        new RegExp(`${pre}${intervaloRe}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
       );
     }
   }
 
-  // Also: "Base" at start of line followed by monetary values (within MEM table context)
-  // Only match if the line has at least one large monetary amount (>100)
+  // Also: "Base" / "B" at start of line followed by monetary values (within MEM table context)
   patrones.push(
-    new RegExp(`^\\s*${intervalo}\\s+[\\d,.]+\\s+[\\d,]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'im'),
+    new RegExp(`^\\s*${intervaloRe}\\s+[\\d,.]+\\s+[\\d,]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'im'),
   );
   patrones.push(
-    new RegExp(`^\\s*${intervalo}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
+    new RegExp(`^\\s*${intervaloRe}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
   );
 
   for (const re of patrones) {
