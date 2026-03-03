@@ -16,12 +16,21 @@ export default function KPICard({
   icon,
 }: KPICardProps) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition">
+    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover-lift group relative overflow-hidden transition-all duration-300">
+      {/* Subtle accent line at top */}
+      <div
+        className={clsx('absolute top-0 left-0 right-0 h-0.5 transition-all duration-300 group-hover:h-1', {
+          'bg-slate-300': variant === 'default',
+          'bg-emerald-500': variant === 'positive',
+          'bg-red-500': variant === 'negative',
+          'bg-brand-500': variant === 'highlight',
+        })}
+      />
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-slate-500">{label}</p>
           <p
-            className={clsx('text-2xl font-bold mt-1', {
+            className={clsx('text-2xl font-bold mt-1 animate-count-bounce', {
               'text-slate-800': variant === 'default',
               'text-emerald-600': variant === 'positive',
               'text-red-600': variant === 'negative',
@@ -36,7 +45,7 @@ export default function KPICard({
         </div>
         {icon && (
           <div
-            className={clsx('p-2 rounded-lg', {
+            className={clsx('p-2 rounded-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3', {
               'bg-slate-100': variant === 'default',
               'bg-emerald-50': variant === 'positive',
               'bg-red-50': variant === 'negative',

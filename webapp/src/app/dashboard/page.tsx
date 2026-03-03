@@ -79,7 +79,7 @@ export default function DashboardPage() {
       <Header />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 animate-fade-in-up">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Mis Proyectos</h1>
             <p className="text-sm text-slate-500 mt-1">
@@ -88,7 +88,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/proyecto/nuevo"
-            className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+            className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm btn-press hover-lift shadow-md hover:shadow-lg"
           >
             <Plus className="w-4 h-4" />
             Nuevo Proyecto
@@ -97,8 +97,10 @@ export default function DashboardPage() {
 
         {/* Project cards */}
         {proyectos.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-            <FolderOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center animate-scale-in">
+            <div className="animate-float inline-block">
+              <FolderOpen className="w-14 h-14 text-slate-300 mx-auto mb-4" />
+            </div>
             <h3 className="text-lg font-semibold text-slate-600 mb-2">
               Aún no tienes proyectos
             </h3>
@@ -107,32 +109,35 @@ export default function DashboardPage() {
             </p>
             <Link
               href="/proyecto/nuevo"
-              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition text-sm"
+              className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition text-sm btn-press animate-pulse-glow"
             >
               <Plus className="w-4 h-4" />
               Crear Proyecto
             </Link>
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
             {proyectos.map((p) => {
               const hasResults = !!p.resultadosJson;
               return (
                 <div
                   key={p.id}
-                  className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition group"
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm hover-lift group relative overflow-hidden"
                 >
-                  <Link href={`/proyecto/${p.id}`} className="block p-5">
+                  {/* Decorative accent bar */}
+                  <div className={`absolute top-0 left-0 right-0 h-1 ${hasResults ? 'bg-gradient-to-r from-emerald-400 to-emerald-600' : 'bg-gradient-to-r from-amber-400 to-amber-500'} transition-all duration-300 group-hover:h-1.5`} />
+                  
+                  <Link href={`/proyecto/${p.id}`} className="block p-5 pt-6">
                     <div className="flex items-start justify-between mb-3">
-                      <h3 className="font-semibold text-slate-800 group-hover:text-brand-600 transition">
+                      <h3 className="font-semibold text-slate-800 group-hover:text-brand-600 transition-colors duration-200">
                         {p.nombre}
                       </h3>
                       {hasResults ? (
-                        <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
                           Analizado
                         </span>
                       ) : (
-                        <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
                           Pendiente
                         </span>
                       )}
@@ -172,7 +177,7 @@ export default function DashboardPage() {
                         e.stopPropagation();
                         setDeleteId(p.id);
                       }}
-                      className="text-slate-400 hover:text-red-500 transition p-1"
+                      className="text-slate-400 hover:text-red-500 transition-colors duration-200 p-1 hover:bg-red-50 rounded-md"
                       title="Eliminar proyecto"
                     >
                       <Trash2 className="w-4 h-4" />

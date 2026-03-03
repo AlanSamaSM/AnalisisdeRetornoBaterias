@@ -6,7 +6,7 @@ function Pulse({ className }: { className?: string }) {
   return (
     <div
       className={clsx(
-        'animate-pulse rounded bg-slate-200',
+        'rounded skeleton-shimmer',
         className,
       )}
     />
