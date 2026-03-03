@@ -1,25 +1,13 @@
-// ─── Prisma Schema - BESS Analyzer ───
-// PostgreSQL (Neon serverless) for Vercel deployment
+// ─── Prisma Schema - BESS Analyzer (Desktop) ───
+// SQLite local — sin autenticación, datos privados en disco
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  password  String
-  empresa   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  proyectos Proyecto[]
+  provider = "sqlite"
+  url      = "file:./bess.db"
 }
 
 model Proyecto {
@@ -33,9 +21,6 @@ model Proyecto {
   notas     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Parámetros BESS
   potenciaKw     Float    @default(0)
@@ -59,7 +44,7 @@ model Proyecto {
   ciclosAnuales       Int     @default(300)
   umbralRecompra      Float   @default(0.70)
 
-  // Resultados calculados (JSON serializado) - PostgreSQL TEXT no tiene límite de tamaño
+  // Resultados calculados (JSON serializado)
   resultadosJson String?
 
   recibos Recibo[]

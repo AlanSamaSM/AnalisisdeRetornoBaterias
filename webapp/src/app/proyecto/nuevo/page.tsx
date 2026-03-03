@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { Loader2, ChevronDown, HelpCircle } from 'lucide-react';
@@ -64,7 +63,6 @@ function Label({
 }
 
 export default function NuevoProyectoPage() {
-  const { data: session } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({

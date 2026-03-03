@@ -27,8 +27,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  output: 'standalone',
   experimental: {
-    serverComponentsExternalPackages: ['pdfjs-dist', 'bcryptjs'],
+    serverComponentsExternalPackages: ['pdfjs-dist'],
     outputFileTracingIncludes: {
       '/api/analizar': ['./node_modules/pdfjs-dist/**/*'],
     },

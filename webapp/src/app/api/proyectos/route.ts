@@ -1,21 +1,10 @@
 // ─── API: CRUD Proyectos ────────────────────────────────────────────────────
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
-async function getUserId() {
-  const session = await getServerSession(authOptions);
-  return (session?.user as any)?.id as string | undefined;
-}
-
-// GET /api/proyectos — lista proyectos del usuario
+// GET /api/proyectos — lista todos los proyectos
 export async function GET() {
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
   const proyectos = await prisma.proyecto.findMany({
-    where: { userId },
     orderBy: { createdAt: 'desc' },
     include: { recibos: { select: { id: true, mes: true, anio: true } } },
   });
@@ -25,9 +14,6 @@ export async function GET() {
 
 // POST /api/proyectos — crear nuevo proyecto
 export async function POST(req: NextRequest) {
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
   const body = await req.json();
   const {
     nombre,
@@ -94,7 +80,6 @@ export async function POST(req: NextRequest) {
       tasaDegradacion: numVal(tasaDegradacion, 0, 0.10, 0.02),
       ciclosAnuales: numVal(ciclosAnuales, 1, 1000, 300),
       umbralRecompra: numVal(umbralRecompra, 0.50, 0.95, 0.70),
-      userId,
     },
   });
 

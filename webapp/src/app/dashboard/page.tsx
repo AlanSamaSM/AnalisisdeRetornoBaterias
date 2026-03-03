@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -25,17 +24,11 @@ interface Proyecto {
 }
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const [proyectos, setProyectos] = useState<Proyecto[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login');
-  }, [status, router]);
-
-  useEffect(() => {
-    if (status !== 'authenticated') return;
     fetch('/api/proyectos')
       .then((r) => r.json())
       .then((data) => {
@@ -43,7 +36,7 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [status]);
+  }, []);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
@@ -59,7 +52,7 @@ export default function DashboardPage() {
     setDeleteId(null);
   };
 
-  if (status === 'loading' || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Header />

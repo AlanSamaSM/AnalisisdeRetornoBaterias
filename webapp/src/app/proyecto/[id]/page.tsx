@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import KPICard from '@/components/KPICard';
@@ -59,7 +58,6 @@ function fmtCompact(n: number): string {
 }
 
 export default function ProyectoPage() {
-  const { data: session, status } = useSession();
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
@@ -73,13 +71,8 @@ export default function ProyectoPage() {
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [showLog, setShowLog] = useState(false);
 
-  useEffect(() => {
-    if (status === 'unauthenticated') router.push('/login');
-  }, [status, router]);
-
   // Load project
   useEffect(() => {
-    if (status !== 'authenticated') return;
     fetch(`/api/proyectos/${id}`)
       .then((r) => {
         if (!r.ok) throw new Error('Not found');
@@ -95,7 +88,7 @@ export default function ProyectoPage() {
       .catch(() => {
         router.push('/dashboard');
       });
-  }, [status, id, router]);
+  }, [id, router]);
 
   // Upload PDFs and run analysis
   const handleAnalizar = async () => {

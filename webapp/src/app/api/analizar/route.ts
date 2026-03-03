@@ -1,7 +1,5 @@
 // ─── API: Analizar recibos (upload PDFs + run financial model) ──────────────
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import {
   extraerTextoPdf,
@@ -41,18 +39,10 @@ class AnalisisLog {
   }
 }
 
-async function getUserId() {
-  const session = await getServerSession(authOptions);
-  return (session?.user as any)?.id as string | undefined;
-}
-
 // POST /api/analizar — upload PDFs, parse, run simulation, save results
 export async function POST(req: NextRequest) {
   const log = new AnalisisLog();
   log.log('=== INICIO ANÁLISIS ===');
-
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
   try {
     const formData = await req.formData();
@@ -62,9 +52,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'proyectoId requerido' }, { status: 400 });
     }
 
-    // Verify project ownership
+    // Verify project exists
     const proyecto = await prisma.proyecto.findFirst({
-      where: { id: proyectoId, userId },
+      where: { id: proyectoId },
     });
     if (!proyecto) {
       return NextResponse.json({ error: 'Proyecto no encontrado' }, { status: 404 });

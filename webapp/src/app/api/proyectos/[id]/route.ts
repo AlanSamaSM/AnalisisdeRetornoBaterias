@@ -1,24 +1,14 @@
 // ─── API: Proyecto individual ────────────────────────────────────────────────
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
-
-async function getUserId() {
-  const session = await getServerSession(authOptions);
-  return (session?.user as any)?.id as string | undefined;
-}
 
 // GET /api/proyectos/[id]
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
   const proyecto = await prisma.proyecto.findFirst({
-    where: { id: params.id, userId },
+    where: { id: params.id },
     include: { recibos: { orderBy: [{ anio: 'asc' }, { mesNum: 'asc' }] } },
   });
 
@@ -34,11 +24,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
   const exists = await prisma.proyecto.findFirst({
-    where: { id: params.id, userId },
+    where: { id: params.id },
   });
   if (!exists) {
     return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
@@ -74,11 +61,8 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const userId = await getUserId();
-  if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
-
   const exists = await prisma.proyecto.findFirst({
-    where: { id: params.id, userId },
+    where: { id: params.id },
   });
   if (!exists) {
     return NextResponse.json({ error: 'No encontrado' }, { status: 404 });
