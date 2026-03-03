@@ -48,17 +48,29 @@ const ESTADOS_CFE: Record<string, string> = {
 
 const CIUDADES_ESTADO: Record<string, string> = {
   TORREON: 'COAHUILA', SALTILLO: 'COAHUILA', MONCLOVA: 'COAHUILA',
+  'RAMOS ARIZPE': 'COAHUILA', 'PIEDRAS NEGRAS': 'COAHUILA',
   MONTERREY: 'NUEVO LEON', 'SAN PEDRO': 'NUEVO LEON',
-  GUADALAJARA: 'JALISCO', ZAPOPAN: 'JALISCO',
+  'SAN NICOLAS': 'NUEVO LEON', 'SANTA CATARINA': 'NUEVO LEON',
+  'GARCIA': 'NUEVO LEON', 'APODACA': 'NUEVO LEON',
+  'GUADALUPE': 'NUEVO LEON', 'ESCOBEDO': 'NUEVO LEON',
+  'SALINAS VICTORIA': 'NUEVO LEON', 'CIENEGA DE FLORES': 'NUEVO LEON',
+  'CADEREYTA': 'NUEVO LEON', 'JUAREZ': 'NUEVO LEON',
+  'PESQUERIA': 'NUEVO LEON', 'ZUAZUA': 'NUEVO LEON',
+  'GENERAL ESCOBEDO': 'NUEVO LEON',
+  GUADALAJARA: 'JALISCO', ZAPOPAN: 'JALISCO', TLAQUEPAQUE: 'JALISCO',
   PUEBLA: 'PUEBLA', QUERETARO: 'QUERETARO',
   'SAN JUAN DEL RIO': 'QUERETARO', 'SN JUAN DEL RIO': 'QUERETARO',
-  LEON: 'GUANAJUATO', CELAYA: 'GUANAJUATO',
-  CHIHUAHUA: 'CHIHUAHUA', JUAREZ: 'CHIHUAHUA', 'CD JUAREZ': 'CHIHUAHUA',
+  'EL MARQUES': 'QUERETARO', CORREGIDORA: 'QUERETARO',
+  LEON: 'GUANAJUATO', CELAYA: 'GUANAJUATO', IRAPUATO: 'GUANAJUATO',
+  SALAMANCA: 'GUANAJUATO', SILAO: 'GUANAJUATO',
+  CHIHUAHUA: 'CHIHUAHUA', 'CD JUAREZ': 'CHIHUAHUA',
   HERMOSILLO: 'SONORA', TIJUANA: 'BAJA CALIFORNIA',
+  MEXICALI: 'BAJA CALIFORNIA', ENSENADA: 'BAJA CALIFORNIA',
   MERIDA: 'YUCATAN', CANCUN: 'QUINTANA ROO',
   AGUASCALIENTES: 'AGUASCALIENTES', DURANGO: 'DURANGO',
   'TUXTLA GUTIERREZ': 'CHIAPAS', VILLAHERMOSA: 'TABASCO',
   TAMPICO: 'TAMAULIPAS', REYNOSA: 'TAMAULIPAS',
+  MATAMOROS: 'TAMAULIPAS', 'NUEVO LAREDO': 'TAMAULIPAS',
   MORELIA: 'MICHOACAN', TOLUCA: 'ESTADO DE MEXICO',
   CUERNAVACA: 'MORELOS', OAXACA: 'OAXACA',
   MAZATLAN: 'SINALOA', CULIACAN: 'SINALOA',
@@ -85,21 +97,60 @@ function extraerEstadoMunicipio(texto: string): { estado: string; municipio: str
   let estado = '';
   let municipio = '';
 
+  // Pattern 1: "CIUDAD, ABREV." at end of line (most common CFE format)
   const match = texto.match(
     /([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s.]+?)\s*,\s*([A-ZÁÉÍÓÚÑ.]{2,6})\s*\.?\s*$/m,
   );
   if (match) {
     const ciudadRaw = match[1].trim().replace(/,$/, '').trim();
     const estadoAbrev = match[2].trim().replace(/\.$/, '');
-    const upper = estadoAbrev.toUpperCase();
+    // Strip ALL dots for lookup: "N.L" → "NL", "B.C.S" → "BCS"
+    const normalized = estadoAbrev.toUpperCase().replace(/\./g, '');
 
-    if (upper in ESTADOS_CFE) {
-      estado = ESTADOS_CFE[upper];
+    if (normalized in ESTADOS_CFE) {
+      estado = ESTADOS_CFE[normalized];
     }
     municipio = ciudadRaw.toUpperCase();
+  }
 
+  // Pattern 2: "CIUDAD N.L." or "CIUDAD, N.L., C.P. XXXXX" on same line
+  // (pdfjs-dist often merges address lines)
+  if (!estado) {
+    const match2 = texto.match(
+      /([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+?)\s+([A-Z]\.?[A-Z]\.?[A-Z]?\.?[A-Z]?\.?)\s*[,.]?\s*(?:C\.?P\.?|\d{5})/im,
+    );
+    if (match2) {
+      const ciudadRaw2 = match2[1].trim();
+      const abrev2 = match2[2].replace(/\./g, '').toUpperCase();
+      if (abrev2 in ESTADOS_CFE) {
+        estado = ESTADOS_CFE[abrev2];
+        if (!municipio) municipio = ciudadRaw2.toUpperCase();
+      }
+    }
+  }
+
+  // Pattern 3: If municipio still contains state abbreviation suffix, strip it
+  // e.g., "SALINAS VICTORIA N.L" → municipio="SALINAS VICTORIA", estado="NUEVO LEON"
+  if (municipio) {
+    for (const [abrev, estadoNombre] of Object.entries(ESTADOS_CFE)) {
+      // Check for abbreviation with dots: "N.L", "N.L.", " NL"
+      const dotted = abrev.split('').join('\\.');
+      const suffixRe = new RegExp(`\\s+(?:${abrev}\\.?|${dotted}\\.?)\\s*$`, 'i');
+      if (suffixRe.test(municipio)) {
+        municipio = municipio.replace(suffixRe, '').trim();
+        if (!estado) estado = estadoNombre;
+        break;
+      }
+    }
+  }
+
+  // Clean up municipio: remove trailing dots, commas
+  municipio = municipio.replace(/[.,]+$/, '').trim();
+
+  // Lookup in CIUDADES_ESTADO for better matching and estado inference
+  if (municipio) {
     for (const [ciudad, est] of Object.entries(CIUDADES_ESTADO)) {
-      if (ciudad.includes(municipio) || municipio.includes(ciudad)) {
+      if (ciudad === municipio || ciudad.includes(municipio) || municipio.includes(ciudad)) {
         municipio = ciudad;
         if (!estado) estado = est;
         break;
@@ -358,14 +409,46 @@ function extraerCargoDistribucion(texto: string): number {
  */
 function extraerCargoEnergiaIntervalo(texto: string, intervalo: string): number {
   // Build patterns for the specific interval
-  const patrones = [
-    // "Energía Base  0.00  250,000.00  0.00  250,000.00"
-    new RegExp(`Energ[ií]a\\s+${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
-    // "Energía Base  250,000.00"
-    new RegExp(`Energ[ií]a\\s+${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
-    // Fallback: line with Energía + interval and number at end
-    new RegExp(`Energ[ií]a\\s+${intervalo}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
+  // CFE MEM table may show: "Energía Base", "Generación Base", "Suministro Base",
+  // or just "Base" as a sub-row under an "Energía" / "Suministro" / "Generación" header.
+  const prefijos = [
+    `Energ[ií]a\\s+`,
+    `Generaci[oó]n\\s+`,
+    `Suministro\\s+`,
+    ``, // Just the interval name alone (sub-row)
   ];
+
+  const patrones: RegExp[] = [];
+  for (const pre of prefijos) {
+    // "Energía Base  0.00  250,000.00  0.00  250,000.00" → last number
+    patrones.push(
+      new RegExp(`${pre}${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+    );
+    // "Energía Base  1.1234  340,968  383,091.14  0.00  383,091.14" (price qty amount IVA total)
+    patrones.push(
+      new RegExp(`${pre}${intervalo}\\s+[\\d.]+\\s+[\\d,]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+    );
+    // "Energía Base  250,000.00"
+    patrones.push(
+      new RegExp(`${pre}${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+    );
+    // Fallback: line with prefix + interval and number at end of line
+    if (pre) {
+      patrones.push(
+        new RegExp(`${pre}${intervalo}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
+      );
+    }
+  }
+
+  // Also: "Base" at start of line followed by monetary values (within MEM table context)
+  // Only match if the line has at least one large monetary amount (>100)
+  patrones.push(
+    new RegExp(`^\\s*${intervalo}\\s+[\\d,.]+\\s+[\\d,]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'im'),
+  );
+  patrones.push(
+    new RegExp(`^\\s*${intervalo}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
+  );
+
   for (const re of patrones) {
     const m = texto.match(re);
     if (m) {

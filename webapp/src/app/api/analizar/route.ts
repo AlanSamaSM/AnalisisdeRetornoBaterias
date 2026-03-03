@@ -148,6 +148,24 @@ export async function POST(req: NextRequest) {
           log.log(`    Cargo distribución: $${r.cargoDistribucion || 0} | Energía Punta: $${r.cargoEnergiaPunta || 0} | Energía Inter: $${r.cargoEnergiaIntermedia || 0} | Energía Base: $${r.cargoEnergiaBase || 0}`);
           log.log(`    Importe total recibo: $${r.importeTotal || 0}`);
 
+          // Debug: if Energía values are all 0, log text around cost table keywords
+          if ((r.cargoEnergiaPunta || 0) === 0 && (r.cargoEnergiaIntermedia || 0) === 0 && (r.cargoEnergiaBase || 0) === 0) {
+            // Find keywords that indicate the MEM cost table
+            for (const kw of ['Generaci', 'Suministro', 'Energ']) {
+              const idx = texto.indexOf(kw);
+              if (idx >= 0) {
+                const snippet = texto.substring(idx, idx + 200).replace(/\n/g, ' | ');
+                log.log(`    [DEBUG Energía] Found "${kw}" at pos ${idx}: "${snippet}"`);
+                break;
+              }
+            }
+            // Also log lines containing "Base" with monetary amounts
+            const baseLines = texto.split('\n').filter(l => /Base.*\d{1,3}(,\d{3})*\.\d{2}/.test(l));
+            if (baseLines.length > 0) {
+              log.log(`    [DEBUG Energía] Lines with "Base" + money: ${baseLines.slice(0, 3).map(l => `"${l.trim()}"`).join(' | ')}`);
+            }
+          }
+
           if (r.advertencias.length > 0) {
             log.warn(`    Advertencias: ${r.advertencias.join('; ')}`);
           }

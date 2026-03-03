@@ -93,8 +93,35 @@ export function cargarTodasTarifas(): TarifaGDMTH[] {
 }
 
 /**
+ * Map of states to their nearest proxy state (for when exact match is missing).
+ * Grouped by geographic/tariff similarity (same CRE division/region).
+ */
+const ESTADO_PROXY: Record<string, string> = {
+  // Norte
+  'NUEVO LEON': 'COAHUILA',
+  TAMAULIPAS: 'COAHUILA',
+  CHIHUAHUA: 'COAHUILA',
+  DURANGO: 'COAHUILA',
+  'SAN LUIS POTOSI': 'COAHUILA',
+  ZACATECAS: 'AGUASCALIENTES',
+  // Bajío
+  JALISCO: 'GUANAJUATO',
+  MICHOACAN: 'GUANAJUATO',
+  COLIMA: 'GUANAJUATO',
+  NAYARIT: 'GUANAJUATO',
+  // Centro
+  PUEBLA: 'QUERETARO',
+  HIDALGO: 'QUERETARO',
+  TLAXCALA: 'QUERETARO',
+  'ESTADO DE MEXICO': 'QUERETARO',
+  'CIUDAD DE MEXICO': 'QUERETARO',
+  MORELOS: 'QUERETARO',
+};
+
+/**
  * Filters tarifas by estado and municipio.
  * Falls back to just estado match if no municipio match found.
+ * Falls back to a nearby proxy state if the requested state isn't in the data.
  */
 export function filtrarTarifas(
   all: TarifaGDMTH[],
@@ -121,7 +148,20 @@ export function filtrarTarifas(
     }
   }
 
-  // Fallback: if nothing matches, return rows for the most complete municipio
+  // Fallback: try proxy state (geographic proximity)
+  if (filtered.length === 0 && e && ESTADO_PROXY[e]) {
+    const proxy = ESTADO_PROXY[e];
+    const proxyRows = all.filter((t) => t.estado.toUpperCase() === proxy);
+    if (proxyRows.length > 0) {
+      const firstMun = proxyRows[0].municipio;
+      filtered = proxyRows.filter((t) => t.municipio === firstMun);
+      console.log(
+        `Tarifas: Estado ${e} no disponible, usando proxy ${proxy}/${firstMun} (${filtered.length} rows)`,
+      );
+    }
+  }
+
+  // Last resort: if nothing matches, return rows for the most complete municipio
   // (the one with all 3 horarios: BASE, INTERMEDIA, PUNTA = 36 rows)
   if (filtered.length === 0 && all.length > 0) {
     // Group by estado+municipio and find the most complete set
