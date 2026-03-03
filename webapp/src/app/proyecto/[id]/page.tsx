@@ -199,6 +199,13 @@ export default function ProyectoPage() {
     await generarReportePDF(proyecto, resultados);
   };
 
+  // Download Excel report
+  const handleDescargarExcel = async () => {
+    if (!resultados) return;
+    const { generarReporteExcel } = await import('@/lib/generar-reporte-excel');
+    await generarReporteExcel(proyecto, resultados);
+  };
+
   if (loading || status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -236,13 +243,22 @@ export default function ProyectoPage() {
               </button>
             )}
             {resultados && (
-              <button
-                onClick={handleDescargarPDF}
-                className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
-              >
-                <Download className="w-4 h-4" />
-                Descargar PDF
-              </button>
+              <>
+                <button
+                  onClick={handleDescargarExcel}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar Excel
+                </button>
+                <button
+                  onClick={handleDescargarPDF}
+                  className="bg-slate-800 hover:bg-slate-900 text-white font-semibold px-5 py-2.5 rounded-lg transition flex items-center gap-2 text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar PDF
+                </button>
+              </>
             )}
           </div>
         </div>
