@@ -34,10 +34,15 @@ export interface DatosProyecto {
 
 // ─── Colores y constantes ────────────────────────────────────────────────────
 const BRAND = [19, 40, 87] as const;       // #132857
-const BRAND_LIGHT = [30, 64, 130] as const;
+const BRAND_LIGHT = [30, 64, 130] as const; // #1E4082
 const GRAY = [100, 100, 100] as const;
 const DARK = [33, 37, 41] as const;
 const WHITE = [255, 255, 255] as const;
+const ACCENT_GREEN = [0, 180, 120] as const;   // #00B478
+const ACCENT_RED = [220, 38, 38] as const;     // #DC2626
+const ACCENT_AMBER = [245, 158, 11] as const;  // #F59E0B
+const ACCENT_EMERALD = [22, 163, 74] as const; // #16A34A
+const LIGHT_BG = [248, 250, 252] as const;     // #F8FAFC
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 20;
@@ -64,136 +69,450 @@ function fechaHoy(): string {
   return `${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
 }
 
+// ─── Helpers de Dibujo ──────────────────────────────────────────────────────
+
+function drawKPICard(
+  doc: jsPDF,
+  x: number, y: number,
+  w: number, h: number,
+  label: string,
+  value: string,
+  accentColor: readonly [number, number, number],
+  subtitle?: string,
+): void {
+  doc.setFillColor(LIGHT_BG[0], LIGHT_BG[1], LIGHT_BG[2]);
+  doc.setDrawColor(230, 230, 235);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(x, y, w, h, 3, 3, 'FD');
+  // Left accent bar
+  doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+  doc.roundedRect(x, y, 3, h, 3, 0, 'F');
+  doc.rect(x + 1.5, y, 1.5, h, 'F');
+  // Label
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+  doc.text(label, x + 8, y + 9);
+  // Value
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+  const valLines = doc.splitTextToSize(value, w - 12);
+  doc.text(valLines, x + 8, y + 19);
+  // Subtitle
+  if (subtitle) {
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    doc.text(subtitle, x + 8, y + (valLines.length > 1 ? 28 : 26));
+  }
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+}
+
+function drawDonutChart(
+  doc: jsPDF,
+  cx: number, cy: number,
+  outerR: number, innerR: number,
+  segments: { value: number; color: readonly [number, number, number]; label: string }[],
+): void {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total === 0) return;
+  let startAngle = -Math.PI / 2;
+  for (const seg of segments) {
+    const sweep = (seg.value / total) * 2 * Math.PI;
+    if (sweep < 0.01) { startAngle += sweep; continue; }
+    doc.setFillColor(seg.color[0], seg.color[1], seg.color[2]);
+    const pts: [number, number][] = [];
+    const steps = Math.max(12, Math.ceil((sweep / (Math.PI * 2)) * 72));
+    for (let i = 0; i <= steps; i++) {
+      const a = startAngle + (sweep * i) / steps;
+      pts.push([cx + outerR * Math.cos(a), cy + outerR * Math.sin(a)]);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const a = startAngle + (sweep * i) / steps;
+      pts.push([cx + innerR * Math.cos(a), cy + innerR * Math.sin(a)]);
+    }
+    if (pts.length > 2) {
+      const rel: [number, number][] = [];
+      for (let i = 1; i < pts.length; i++) {
+        rel.push([pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]);
+      }
+      doc.lines(rel, pts[0][0], pts[0][1], [1, 1], 'F', true);
+    }
+    startAngle += sweep;
+  }
+}
+
+function drawHorizontalBarChart(
+  doc: jsPDF,
+  x: number, y: number,
+  w: number,
+  data: { label: string; value: number }[],
+  options?: { zeroLine?: boolean; roiYear?: number | null },
+): number {
+  if (data.length === 0) return y;
+  const maxAbs = Math.max(...data.map(d => Math.abs(d.value)), 1);
+  const barH = Math.min(120 / data.length, 6);
+  const spacing = 1.2;
+  const labelW = 18;
+  const valueW = 22;
+  const chartW = w - labelW - valueW - 4;
+  const zeroX = x + labelW + chartW / 2;
+  const totalH = data.length * (barH + spacing) + 4;
+  // Background
+  doc.setFillColor(LIGHT_BG[0], LIGHT_BG[1], LIGHT_BG[2]);
+  doc.roundedRect(x, y, w, totalH, 2, 2, 'F');
+  // Zero line
+  if (options?.zeroLine !== false) {
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.line(zeroX, y + 1, zeroX, y + totalH - 1);
+    doc.setLineWidth(0.2);
+    doc.setDrawColor(0, 0, 0);
+  }
+  data.forEach((d, i) => {
+    const by = y + 2 + i * (barH + spacing);
+    // Label
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    doc.text(d.label, x + 2, by + barH / 2 + 1.2);
+    // Bar
+    const barW = Math.max((Math.abs(d.value) / maxAbs) * (chartW / 2), 0.5);
+    const isPositive = d.value >= 0;
+    const color = isPositive ? ACCENT_EMERALD : ACCENT_RED;
+    doc.setFillColor(color[0], color[1], color[2]);
+    if (isPositive) {
+      doc.roundedRect(zeroX, by, barW, barH, 0.5, 0.5, 'F');
+    } else {
+      doc.roundedRect(zeroX - barW, by, barW, barH, 0.5, 0.5, 'F');
+    }
+    // ROI marker
+    if (options?.roiYear != null && i === options.roiYear) {
+      doc.setFillColor(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2]);
+      doc.circle(x + w - 5, by + barH / 2, 1.5, 'F');
+      doc.setFontSize(4.5);
+      doc.setTextColor(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2]);
+      doc.text('ROI', x + w - 2, by + barH / 2 + 1);
+    }
+    // Value
+    doc.setFontSize(5.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    const valTxt = `$${(d.value / 1_000_000).toFixed(2)}M`;
+    doc.text(valTxt, x + labelW + chartW + 2, by + barH / 2 + 1.2);
+  });
+  return y + totalH + 2;
+}
+
+function drawLineChart(
+  doc: jsPDF,
+  x: number, y: number,
+  w: number, h: number,
+  data: { x: number; y: number }[],
+  options?: { yLabel?: string; thresholdY?: number; lineColor?: readonly [number, number, number] },
+): void {
+  if (data.length < 2) return;
+  const xMin = Math.min(...data.map(d => d.x));
+  const xMax = Math.max(...data.map(d => d.x));
+  const yMin = Math.min(...data.map(d => d.y), options?.thresholdY ?? Infinity) * 0.95;
+  const yMax = Math.max(...data.map(d => d.y)) * 1.02;
+  const rangeX = xMax - xMin || 1;
+  const rangeY = yMax - yMin || 1;
+  const toCanvasX = (v: number) => x + ((v - xMin) / rangeX) * w;
+  const toCanvasY = (v: number) => y + h - ((v - yMin) / rangeY) * h;
+  // Axes
+  doc.setDrawColor(GRAY[0], GRAY[1], GRAY[2]);
+  doc.setLineWidth(0.3);
+  doc.line(x, y + h, x + w, y + h);
+  doc.line(x, y, x, y + h);
+  if (options?.yLabel) {
+    doc.setFontSize(6);
+    doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    doc.text(options.yLabel, x - 2, y - 2);
+  }
+  // Grid
+  doc.setDrawColor(230, 230, 230);
+  doc.setLineWidth(0.15);
+  for (let i = 1; i <= 4; i++) {
+    const gy = y + (h * i) / 5;
+    doc.line(x, gy, x + w, gy);
+    const val = yMax - (rangeY * i) / 5;
+    doc.setFontSize(5);
+    doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    doc.text(fmtInt(Math.round(val)), x - 1, gy + 1, { align: 'right' });
+  }
+  // Threshold
+  if (options?.thresholdY != null) {
+    const ty = toCanvasY(options.thresholdY);
+    doc.setDrawColor(ACCENT_RED[0], ACCENT_RED[1], ACCENT_RED[2]);
+    doc.setLineWidth(0.4);
+    for (let sx = x; sx < x + w; sx += 4) {
+      doc.line(sx, ty, Math.min(sx + 2, x + w), ty);
+    }
+    doc.setFontSize(5);
+    doc.setTextColor(ACCENT_RED[0], ACCENT_RED[1], ACCENT_RED[2]);
+    doc.text('Umbral', x + w + 1, ty + 1);
+  }
+  // Line
+  const lc = options?.lineColor || BRAND;
+  doc.setDrawColor(lc[0], lc[1], lc[2]);
+  doc.setLineWidth(0.8);
+  for (let i = 1; i < data.length; i++) {
+    doc.line(toCanvasX(data[i - 1].x), toCanvasY(data[i - 1].y),
+             toCanvasX(data[i].x), toCanvasY(data[i].y));
+  }
+  doc.setFillColor(lc[0], lc[1], lc[2]);
+  for (const d of data) {
+    doc.circle(toCanvasX(d.x), toCanvasY(d.y), 0.8, 'F');
+  }
+  // X labels
+  doc.setFontSize(5);
+  doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+  const step = Math.max(1, Math.floor(data.length / 10));
+  for (let i = 0; i < data.length; i += step) {
+    doc.text(String(data[i].x), toCanvasX(data[i].x), y + h + 4, { align: 'center' });
+  }
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+}
+
+function drawProgressGauge(
+  doc: jsPDF,
+  cx: number, cy: number,
+  r: number,
+  percent: number,
+  label: string,
+): void {
+  const steps = 60;
+  const startA = Math.PI;
+  const endA = 2 * Math.PI;
+  // Background arc
+  doc.setFillColor(235, 235, 235);
+  const bgPts: [number, number][] = [[cx, cy]];
+  for (let i = 0; i <= steps; i++) {
+    const a = startA + ((endA - startA) * i) / steps;
+    bgPts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  const bgRel: [number, number][] = [];
+  for (let i = 1; i < bgPts.length; i++) {
+    bgRel.push([bgPts[i][0] - bgPts[i - 1][0], bgPts[i][1] - bgPts[i - 1][1]]);
+  }
+  doc.lines(bgRel, bgPts[0][0], bgPts[0][1], [1, 1], 'F', true);
+  // Filled arc
+  const pct = Math.min(Math.max(percent, 0), 100);
+  const fillEnd = startA + ((endA - startA) * pct) / 100;
+  const color = pct < 30 ? ACCENT_EMERALD : pct < 60 ? ACCENT_AMBER : ACCENT_RED;
+  doc.setFillColor(color[0], color[1], color[2]);
+  const fPts: [number, number][] = [[cx, cy]];
+  const fSteps = Math.max(8, Math.ceil((pct / 100) * steps));
+  for (let i = 0; i <= fSteps; i++) {
+    const a = startA + ((fillEnd - startA) * i) / fSteps;
+    fPts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  const fRel: [number, number][] = [];
+  for (let i = 1; i < fPts.length; i++) {
+    fRel.push([fPts[i][0] - fPts[i - 1][0], fPts[i][1] - fPts[i - 1][1]]);
+  }
+  doc.lines(fRel, fPts[0][0], fPts[0][1], [1, 1], 'F', true);
+  // Inner circle (gauge hole)
+  doc.setFillColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.circle(cx, cy, r * 0.6, 'F');
+  // Percentage
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(color[0], color[1], color[2]);
+  doc.text(`${pct.toFixed(1)}%`, cx, cy - 2, { align: 'center' });
+  // Label
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+  doc.text(label, cx, cy + 5, { align: 'center' });
+}
+
+function drawCheckIcon(doc: jsPDF, x: number, y: number, size = 3): void {
+  doc.setFillColor(ACCENT_EMERALD[0], ACCENT_EMERALD[1], ACCENT_EMERALD[2]);
+  doc.circle(x + size / 2, y + size / 2, size / 2, 'F');
+  doc.setDrawColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.setLineWidth(0.6);
+  doc.line(x + size * 0.25, y + size * 0.5, x + size * 0.45, y + size * 0.72);
+  doc.line(x + size * 0.45, y + size * 0.72, x + size * 0.78, y + size * 0.28);
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+}
+
 // ─── Secciones del PDF ──────────────────────────────────────────────────────
 
 function renderPortada(doc: jsPDF, proyecto: DatosProyecto): void {
-  // Fondo degradado superior
+  // Fondo navy expandido (~52% de la página)
   doc.setFillColor(BRAND[0], BRAND[1], BRAND[2]);
-  doc.rect(0, 0, PAGE_W, 120, 'F');
+  doc.rect(0, 0, PAGE_W, 155, 'F');
 
-  // Línea decorativa
-  doc.setFillColor(0, 180, 120);
-  doc.rect(0, 120, PAGE_W, 4, 'F');
+  // Textura sutil: líneas horizontales ligeramente más claras
+  doc.setFillColor(BRAND_LIGHT[0], BRAND_LIGHT[1], BRAND_LIGHT[2]);
+  for (let i = 0; i < 5; i++) {
+    doc.rect(0, 28 + i * 25, PAGE_W, 0.3, 'F');
+  }
+
+  // Línea decorativa verde (6px)
+  doc.setFillColor(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2]);
+  doc.rect(0, 155, PAGE_W, 5, 'F');
 
   // Título principal
   doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
-  doc.text('ESTUDIO TECNICO-ECONOMICO', PAGE_W / 2, 55, { align: 'center' });
+  doc.text('ESTUDIO TÉCNICO-ECONÓMICO', PAGE_W / 2, 50, { align: 'center' });
 
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
-  doc.text('Sistema hibrido de Almacenamiento', PAGE_W / 2, 70, { align: 'center' });
-  doc.text('de Energia (BESS)', PAGE_W / 2, 80, { align: 'center' });
+  doc.text('Sistema híbrido de Almacenamiento', PAGE_W / 2, 68, { align: 'center' });
+  doc.text('de Energía (BESS)', PAGE_W / 2, 78, { align: 'center' });
 
-  // Icono batería dibujado con primitivas
-  const bx = PAGE_W / 2 - 10;
-  const by = 90;
-  doc.setFillColor(0, 180, 120);
-  doc.roundedRect(bx, by, 20, 14, 2, 2, 'F');
+  // Icono batería más grande y detallado
+  const bx = PAGE_W / 2 - 15;
+  const by = 92;
+  doc.setFillColor(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2]);
+  doc.roundedRect(bx, by, 30, 20, 3, 3, 'F');
   doc.setFillColor(WHITE[0], WHITE[1], WHITE[2]);
-  doc.rect(bx + 20, by + 4, 3, 6, 'F');
-  // Rayo interior
+  doc.rect(bx + 30, by + 6, 4, 8, 'F');
+  // Rayo interior más grande
   doc.setDrawColor(WHITE[0], WHITE[1], WHITE[2]);
-  doc.setLineWidth(1.5);
-  doc.line(bx + 12, by + 2, bx + 8, by + 7);
-  doc.line(bx + 8, by + 7, bx + 13, by + 7);
-  doc.line(bx + 13, by + 7, bx + 9, by + 12);
+  doc.setLineWidth(2);
+  doc.line(bx + 17, by + 2, bx + 12, by + 10);
+  doc.line(bx + 12, by + 10, bx + 19, by + 10);
+  doc.line(bx + 19, by + 10, bx + 14, by + 18);
   doc.setLineWidth(0.2);
   doc.setDrawColor(0, 0, 0);
 
-  // Datos del proyecto
-  let y = 150;
+  // Tagline
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2]);
+  doc.text('Ahorro inteligente en energía eléctrica', PAGE_W / 2, 128, { align: 'center' });
+
+  // Ficha de datos del proyecto (card style)
+  const cardX = 30;
+  const cardY = 175;
+  const cardW = PAGE_W - 60;
+  const cardH = 65;
+
+  doc.setFillColor(LIGHT_BG[0], LIGHT_BG[1], LIGHT_BG[2]);
+  doc.setDrawColor(230, 230, 235);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(cardX, cardY, cardW, cardH, 4, 4, 'FD');
+
+  // Barra de acento izquierda en card
+  doc.setFillColor(BRAND[0], BRAND[1], BRAND[2]);
+  doc.roundedRect(cardX, cardY, 4, cardH, 4, 0, 'F');
+  doc.rect(cardX + 2, cardY, 2, cardH, 'F');
+
+  let cy = cardY + 15;
   doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+  doc.setFontSize(12);
 
-  doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('Proyecto:', MARGIN, y);
+  doc.text('Proyecto:', cardX + 12, cy);
   doc.setFont('helvetica', 'normal');
-  doc.text(proyecto.nombre || 'Sin nombre', MARGIN + 28, y);
+  doc.text(proyecto.nombre || 'Sin nombre', cardX + 38, cy);
+  cy += 11;
 
-  y += 12;
   if (proyecto.integrador) {
     doc.setFont('helvetica', 'bold');
-    doc.text('Integrador:', MARGIN, y);
+    doc.text('Integrador:', cardX + 12, cy);
     doc.setFont('helvetica', 'normal');
-    doc.text(proyecto.integrador, MARGIN + 32, y);
-    y += 12;
+    doc.text(proyecto.integrador, cardX + 42, cy);
+    cy += 11;
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Fecha:', MARGIN, y);
+  doc.text('Fecha:', cardX + 12, cy);
   doc.setFont('helvetica', 'normal');
-  doc.text(fechaHoy(), MARGIN + 19, y);
-  y += 12;
+  doc.text(fechaHoy(), cardX + 28, cy);
+  cy += 11;
 
   if (proyecto.preparadoPor) {
     doc.setFont('helvetica', 'bold');
-    doc.text('Preparado por:', MARGIN, y);
+    doc.text('Preparado por:', cardX + 12, cy);
     doc.setFont('helvetica', 'normal');
-    doc.text(proyecto.preparadoPor, MARGIN + 42, y);
+    doc.text(proyecto.preparadoPor, cardX + 50, cy);
   }
 
-  // Footer de portada
-  doc.setFontSize(9);
+  // Footer profesional
+  doc.setFontSize(8);
   doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-  doc.text('Documento generado por BESS Analyzer', PAGE_W / 2, 275, { align: 'center' });
-  doc.text('Confidencial — Solo para uso interno', PAGE_W / 2, 282, { align: 'center' });
+  doc.setFont('helvetica', 'italic');
+  doc.text('Documento generado por BESS Analyzer', PAGE_W / 2, 265, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.text('Confidencial — Solo para uso del destinatario', PAGE_W / 2, 272, { align: 'center' });
+  doc.setFontSize(7);
+  doc.text(`Versión del documento: ${new Date().toISOString().slice(0, 10)}`, PAGE_W / 2, 279, { align: 'center' });
+
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
 }
 
-function renderIndice(doc: jsPDF): void {
-  doc.addPage();
-  let y = 35;
-
-  // Título
-  doc.setFillColor(BRAND[0], BRAND[1], BRAND[2]);
-  doc.rect(0, 0, PAGE_W, 25, 'F');
+function renderIndiceContent(doc: jsPDF, pageMap: Record<string, number>): void {
+  pageHeader(doc);
   doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
   doc.text('ÍNDICE', PAGE_W / 2, 16, { align: 'center' });
 
+  let y = 35;
   doc.setTextColor(DARK[0], DARK[1], DARK[2]);
-  doc.setFontSize(12);
+
+  const p = (key: string) => String(pageMap[key] || '');
 
   const items = [
-    { num: '1.', titulo: 'Resumen Ejecutivo', pagina: '3' },
-    { num: '  1.1', titulo: 'Situación Actual', pagina: '3' },
-    { num: '  1.2', titulo: 'Solución Propuesta', pagina: '3' },
-    { num: '  1.3', titulo: 'Resultados Clave', pagina: '3' },
-    { num: '2.', titulo: 'Situación Energética Actual del Sitio', pagina: '4' },
-    { num: '  2.1', titulo: 'Información General', pagina: '4' },
-    { num: '  2.2', titulo: 'Consumo Anual', pagina: '4' },
-    { num: '  2.3', titulo: 'Demanda Máxima', pagina: '4' },
-    { num: '  2.4', titulo: 'Estructura Actual de Costos', pagina: '5' },
-    { num: '3.', titulo: 'Solución Técnica Propuesta', pagina: '6' },
-    { num: '  3.1', titulo: 'Características del Sistema', pagina: '6' },
-    { num: '  3.2', titulo: 'Estrategia Operativa', pagina: '6' },
-    { num: '4.', titulo: 'Desplazamiento de Carga', pagina: '7' },
-    { num: '5.', titulo: 'Simulación de Ahorros', pagina: '8' },
-    { num: '6.', titulo: 'Inversión de Capital', pagina: '9' },
-    { num: '7.', titulo: 'Degradación y Recompra', pagina: '10' },
-    { num: '8.', titulo: 'Alcance, Supuestos y Próximos Pasos', pagina: '11' },
+    { num: '', titulo: 'Dashboard Ejecutivo', pagina: p('Dashboard Ejecutivo'), main: true },
+    { num: '1.', titulo: 'Resumen Ejecutivo', pagina: p('1. Resumen Ejecutivo'), main: true },
+    { num: '  1.1', titulo: 'Situación Actual', pagina: p('1. Resumen Ejecutivo'), main: false },
+    { num: '  1.2', titulo: 'Solución Propuesta', pagina: p('1. Resumen Ejecutivo'), main: false },
+    { num: '  1.3', titulo: 'Resultados Clave', pagina: p('1. Resumen Ejecutivo'), main: false },
+    { num: '2.', titulo: 'Situación Energética Actual del Sitio', pagina: p('2. Situación Energética'), main: true },
+    { num: '  2.1', titulo: 'Información General', pagina: p('2. Situación Energética'), main: false },
+    { num: '  2.2', titulo: 'Consumo Anual', pagina: p('2. Situación Energética'), main: false },
+    { num: '  2.3', titulo: 'Demanda Máxima', pagina: p('2. Situación Energética'), main: false },
+    { num: '  2.4', titulo: 'Estructura Actual de Costos', pagina: p('2. Situación Energética'), main: false },
+    { num: '3.', titulo: 'Solución Técnica Propuesta', pagina: p('3. Solución Técnica'), main: true },
+    { num: '  3.1', titulo: 'Características del Sistema', pagina: p('3. Solución Técnica'), main: false },
+    { num: '  3.2', titulo: 'Estrategia Operativa', pagina: p('3. Solución Técnica'), main: false },
+    { num: '4.', titulo: 'Desplazamiento de Carga', pagina: p('4. Desplazamiento'), main: true },
+    { num: '5.', titulo: 'Simulación de Ahorros', pagina: p('5. Simulación'), main: true },
+    { num: '6.', titulo: 'Inversión de Capital', pagina: p('6. Inversión'), main: true },
+    { num: '7.', titulo: 'Degradación y Recompra', pagina: p('7. Degradación'), main: true },
+    { num: '8.', titulo: 'Alcance, Supuestos y Próximos Pasos', pagina: p('8. Alcance'), main: true },
   ];
 
   items.forEach((item) => {
-    const isMain = !item.num.startsWith('  ');
+    const isMain = item.main;
     doc.setFont('helvetica', isMain ? 'bold' : 'normal');
     doc.setFontSize(isMain ? 12 : 11);
-    doc.text(item.num, MARGIN, y);
-    doc.text(item.titulo, MARGIN + 15, y);
+
+    const xStart = isMain ? MARGIN : MARGIN + 10;
+    const numText = item.num.trim();
+
+    if (numText) {
+      doc.text(numText, xStart, y);
+      doc.text(item.titulo, xStart + (isMain ? 15 : 12), y);
+    } else {
+      doc.text(item.titulo, xStart, y);
+    }
 
     // Puntos intermedios
-    const tituloWidth = doc.getTextWidth(item.titulo);
-    const startDots = MARGIN + 15 + tituloWidth + 2;
+    const tituloEnd = numText
+      ? xStart + (isMain ? 15 : 12) + doc.getTextWidth(item.titulo)
+      : xStart + doc.getTextWidth(item.titulo);
     const endDots = PAGE_W - MARGIN - 10;
     doc.setFontSize(8);
     let dotsLine = '';
     const dotWidth = doc.getTextWidth('.');
-    const numDots = Math.floor((endDots - startDots) / dotWidth);
+    const numDots = Math.floor((endDots - tituloEnd - 2) / dotWidth);
     for (let i = 0; i < numDots; i++) dotsLine += '.';
     doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-    doc.text(dotsLine, startDots, y);
+    doc.text(dotsLine, tituloEnd + 2, y);
     doc.setTextColor(DARK[0], DARK[1], DARK[2]);
 
     // Número de página
@@ -238,6 +557,150 @@ function pageHeader(doc: jsPDF): void {
   doc.rect(0, 0, PAGE_W, 25, 'F');
 }
 
+function renderDashboardEjecutivo(
+  doc: jsPDF,
+  proyecto: DatosProyecto,
+  resultados: ResultadoFinanciero,
+): void {
+  doc.addPage();
+  pageHeader(doc);
+  doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Dashboard Ejecutivo', PAGE_W / 2, 16, { align: 'center' });
+
+  let y = 35;
+
+  // ── 2×2 KPI Cards ──
+  const cardW = (CONTENT_W - 8) / 2;
+  const cardH = 32;
+
+  drawKPICard(doc, MARGIN, y, cardW, cardH,
+    'Ahorro Neto Anual',
+    fmt(resultados.totales.ahorroNeto),
+    ACCENT_EMERALD,
+    'Ahorro estimado por año',
+  );
+
+  drawKPICard(doc, MARGIN + cardW + 8, y, cardW, cardH,
+    'Retorno de Inversión',
+    resultados.roiExacto ? `${resultados.roiExacto} años` : 'N/A',
+    BRAND,
+    'Tiempo de recuperación',
+  );
+
+  y += cardH + 8;
+
+  drawKPICard(doc, MARGIN, y, cardW, cardH,
+    'Inversión Total',
+    fmt(resultados.inversionMxn),
+    ACCENT_RED,
+    'Inversión en producto BESS',
+  );
+
+  drawKPICard(doc, MARGIN + cardW + 8, y, cardW, cardH,
+    'Ahorro Total Vida Útil',
+    fmt(resultados.ahorroTotalVidaUtil),
+    ACCENT_GREEN,
+    `Proyección a ${resultados.parametros.aniosProyeccion} años`,
+  );
+
+  y += cardH + 15;
+
+  // ── Banner "Propuesta Óptima" ──
+  const bannerH = 38;
+  doc.setFillColor(BRAND_LIGHT[0], BRAND_LIGHT[1], BRAND_LIGHT[2]);
+  doc.roundedRect(MARGIN, y, CONTENT_W, bannerH, 4, 4, 'F');
+  // Barra verde superior del banner
+  doc.setFillColor(ACCENT_GREEN[0], ACCENT_GREEN[1], ACCENT_GREEN[2]);
+  doc.roundedRect(MARGIN, y, CONTENT_W, 3, 4, 0, 'F');
+  doc.rect(MARGIN, y + 1.5, CONTENT_W, 1.5, 'F');
+
+  doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text('PROPUESTA ÓPTIMA', PAGE_W / 2, y + 13, { align: 'center' });
+
+  // Tres métricas en fila dentro del banner
+  const thirdW = CONTENT_W / 3;
+  const metricsY = y + 23;
+
+  const pctAhorro = resultados.totales.pctAhorroNeto || 0;
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${pctAhorro.toFixed(0)}%`, MARGIN + thirdW / 2, metricsY, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Reducción en capacidad', MARGIN + thirdW / 2, metricsY + 6, { align: 'center' });
+
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  const ahorroM = (resultados.ahorroTotalVidaUtil / 1_000_000).toFixed(1);
+  doc.text(`$${ahorroM}M`, MARGIN + thirdW + thirdW / 2, metricsY, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Ahorro vida útil', MARGIN + thirdW + thirdW / 2, metricsY + 6, { align: 'center' });
+
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('8%', MARGIN + thirdW * 2 + thirdW / 2, metricsY, { align: 'center' });
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Crecimiento tarifario anual', MARGIN + thirdW * 2 + thirdW / 2, metricsY + 6, { align: 'center' });
+
+  y += bannerH + 15;
+
+  // ── Donut de Estructura de Costos ──
+  const ec = resultados.estructuraCostos;
+  if (ec) {
+    y = subHeader(doc, 'Distribución de Costos Eléctricos', y);
+
+    const donutCx = MARGIN + 35;
+    const donutCy = y + 28;
+    const donutSegs = [
+      { value: ec.capacidad.total, color: ACCENT_RED, label: `Capacidad ${ec.capacidad.pct}%` },
+      { value: ec.energiaPunta.total, color: ACCENT_AMBER, label: `E. Punta ${ec.energiaPunta.pct}%` },
+      { value: ec.energiaIntermedia.total, color: [245, 180, 60] as readonly [number, number, number], label: `E. Intermedia ${ec.energiaIntermedia.pct}%` },
+      { value: ec.energiaBase.total, color: ACCENT_EMERALD, label: `E. Base ${ec.energiaBase.pct}%` },
+    ];
+
+    drawDonutChart(doc, donutCx, donutCy, 22, 12, donutSegs);
+
+    // Texto central del donut
+    doc.setFontSize(6);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    doc.text('Costo Anual', donutCx, donutCy - 2, { align: 'center' });
+    doc.setFontSize(8);
+    const costoM = (ec.costoAnualTotal / 1_000_000).toFixed(1);
+    doc.text(`$${costoM}M`, donutCx, donutCy + 4, { align: 'center' });
+
+    // Leyenda a la derecha
+    const legendX = MARGIN + 75;
+    let legendY = y + 12;
+    donutSegs.forEach((seg) => {
+      doc.setFillColor(seg.color[0], seg.color[1], seg.color[2]);
+      doc.rect(legendX, legendY - 2.5, 4, 4, 'F');
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+      doc.text(seg.label, legendX + 7, legendY + 1);
+      legendY += 9;
+    });
+  }
+
+  // Nota al pie
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'italic');
+  doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+  doc.text(
+    'Basado en consumo histórico real y tarifas vigentes CFE GDMTH.',
+    PAGE_W / 2, PAGE_H - 25, { align: 'center' },
+  );
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+}
+
 function renderResumenEjecutivo(
   doc: jsPDF,
   proyecto: DatosProyecto,
@@ -267,7 +730,7 @@ function renderResumenEjecutivo(
   y = bullet(doc, `Demanda máxima registrada: ${fmtInt(demandaMax)} kWp`, y);
   y = bullet(doc, `Costo eléctrico anual: ${fmt(costoAnual)} MXN`, y);
   y = bullet(doc, `${pctCapPunta.toFixed(1)}% de la factura corresponde a cargos por capacidad`, y);
-  y = bullet(doc, `${pctEnergiaPunta.toFixed(1)}% de la factura corresponde a energia punta`, y);
+  y = bullet(doc, `${pctEnergiaPunta.toFixed(1)}% de la factura corresponde a energía punta`, y);
 
   y += 5;
 
@@ -416,9 +879,9 @@ function renderSituacionEnergetica(
       head: [['Componente', 'Monto', '% del Total']],
       body: [
         ['Cargos por capacidad', fmt(ec.capacidad.total), `${ec.capacidad.pct}%`],
-        ['Energia punta', fmt(ec.energiaPunta.total), `${ec.energiaPunta.pct}%`],
-        ['Energia intermedia', fmt(ec.energiaIntermedia.total), `${ec.energiaIntermedia.pct}%`],
-        ['Energia base', fmt(ec.energiaBase.total), `${ec.energiaBase.pct}%`],
+        ['Energía punta', fmt(ec.energiaPunta.total), `${ec.energiaPunta.pct}%`],
+        ['Energía intermedia', fmt(ec.energiaIntermedia.total), `${ec.energiaIntermedia.pct}%`],
+        ['Energía base', fmt(ec.energiaBase.total), `${ec.energiaBase.pct}%`],
       ],
       theme: 'grid',
       styles: { fontSize: 9, cellPadding: 3 },
@@ -432,10 +895,10 @@ function renderSituacionEnergetica(
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'italic');
     doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
-    const descCostos = 'Capacidad: Cargo por demanda maxima medida en punta. '
-      + 'Energia Punta: Costo del kWh consumido en horario punta. '
-      + 'Energia Intermedia: Costo del kWh en horario intermedio. '
-      + 'Energia Base: Costo del kWh en horario base.';
+    const descCostos = 'Capacidad: Cargo por demanda máxima medida en punta. '
+      + 'Energía Punta: Costo del kWh consumido en horario punta. '
+      + 'Energía Intermedia: Costo del kWh en horario intermedio. '
+      + 'Energía Base: Costo del kWh en horario base.';
     const splitDesc = doc.splitTextToSize(descCostos, CONTENT_W);
     doc.text(splitDesc, MARGIN, tblCostY + 5);
     doc.setFont('helvetica', 'normal');
@@ -927,7 +1390,7 @@ function renderAlcanceSupuestos(
     'Validación técnica en sitio',
     'Ingeniería de detalle',
     'Cotización final cerrada',
-    'Cronograma de implementacion (4-6 meses)',
+    'Cronograma de implementación (4-6 meses)',
   ];
   pasos.forEach((paso, i) => {
     doc.text(`${i + 1}. ${paso}`, MARGIN + 3, y);
@@ -954,11 +1417,11 @@ function renderAlcanceSupuestos(
 
   const checks = [
     `Reducir el cargo por capacidad en ~${reduccionPct.toFixed(0)}%`,
-    'Desplazar energia de alto costo (punta a base)',
+    'Desplazar energía de alto costo (punta a base)',
     `Generar un ahorro anual de ${fmt(ahorroAnual)} MXN`,
     resultados.roiExacto
-      ? `Recuperar la inversion en ${resultados.roiExacto} anos`
-      : 'Inversion recuperable dentro del horizonte proyectado',
+      ? `Recuperar la inversión en ${resultados.roiExacto} años`
+      : 'Inversión recuperable dentro del horizonte proyectado',
   ];
 
   checks.forEach((check) => {
@@ -978,36 +1441,54 @@ export async function generarReportePDF(
   resultados: ResultadoFinanciero,
 ): Promise<void> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageMap: Record<string, number> = {};
 
-  // 1. Portada
+  // 1. Portada (página 1)
   renderPortada(doc, proyecto);
 
-  // 2. Índice
-  renderIndice(doc);
+  // 2. Índice — página reservada (se rellena al final con páginas dinámicas)
+  doc.addPage();
+  const indexPage = doc.getNumberOfPages();
 
-  // 3. Resumen Ejecutivo
+  // 3. Dashboard Ejecutivo
+  pageMap['Dashboard Ejecutivo'] = doc.getNumberOfPages() + 1;
+  renderDashboardEjecutivo(doc, proyecto, resultados);
+
+  // 4. Resumen Ejecutivo
+  pageMap['1. Resumen Ejecutivo'] = doc.getNumberOfPages() + 1;
   renderResumenEjecutivo(doc, proyecto, resultados);
 
-  // 4-5. Situación Energética
+  // 5-6. Situación Energética
+  pageMap['2. Situación Energética'] = doc.getNumberOfPages() + 1;
   renderSituacionEnergetica(doc, proyecto, resultados);
 
-  // 6. Solución Técnica
+  // 7. Solución Técnica
+  pageMap['3. Solución Técnica'] = doc.getNumberOfPages() + 1;
   renderSolucionTecnica(doc, proyecto, resultados);
 
-  // 7. Desplazamiento de Carga
+  // 8. Desplazamiento de Carga
+  pageMap['4. Desplazamiento'] = doc.getNumberOfPages() + 1;
   renderDesplazamientoCarga(doc, resultados);
 
-  // 8. Simulación de Ahorros
+  // 9. Simulación de Ahorros
+  pageMap['5. Simulación'] = doc.getNumberOfPages() + 1;
   renderSimulacionAhorros(doc, resultados);
 
-  // 9. Inversión de Capital
+  // 10. Inversión de Capital
+  pageMap['6. Inversión'] = doc.getNumberOfPages() + 1;
   renderInversionCapital(doc, resultados);
 
-  // 10. Degradación y Recompra
+  // 11. Degradación y Recompra
+  pageMap['7. Degradación'] = doc.getNumberOfPages() + 1;
   renderDegradacion(doc, proyecto, resultados);
 
-  // 11. Alcance, Supuestos, Próximos Pasos
+  // 12. Alcance, Supuestos, Próximos Pasos
+  pageMap['8. Alcance'] = doc.getNumberOfPages() + 1;
   renderAlcanceSupuestos(doc, proyecto, resultados);
+
+  // ── Rellenar índice dinámico en página 2 ──
+  doc.setPage(indexPage);
+  renderIndiceContent(doc, pageMap);
 
   // ── Pie de página en todas las páginas ──
   const pageCount = doc.getNumberOfPages();
