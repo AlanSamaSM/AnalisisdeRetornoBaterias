@@ -32,6 +32,8 @@ export interface ParametrosBESS {
   region: string;
   eficiencia: number;
   horasCargaBase: number;
+  tasaDegradacion?: number;
+  ciclosAnuales?: number;
 }
 
 export interface FilaSimulacion {
@@ -79,6 +81,15 @@ export interface FilaInversion {
   ahorroAcumulado: number;
 }
 
+export interface FilaDegradacion {
+  anio: number;
+  capacidadEfectiva: number;     // kWh restantes
+  degradacionPct: number;        // % de degradación acumulada
+  factorCapacidad: number;       // fracción 0-1 de capacidad original
+  ahorroAjustado: number;        // ahorro anual ajustado por degradación
+  requiereRecompra: boolean;     // true si capacidad < umbral para cubrir punta
+}
+
 export interface ResultadoFinanciero {
   parametros: ParametrosBESS;
   inversionMxn: number;
@@ -93,8 +104,11 @@ export interface ResultadoFinanciero {
     pctAhorroNeto: number;
   };
   tablaInversion: FilaInversion[];
+  degradacion: FilaDegradacion[];
   roiExacto: number | null;
   ahorroTotalVidaUtil: number;
+  anioRecompra: number | null;
+  degradacionAcumuladaTotal: number;
 }
 
 // ─── Funciones auxiliares ────────────────────────────────────────────────────
@@ -229,6 +243,53 @@ export function generarComparativoMensual(
   return filas;
 }
 
+// ─── Modelo de degradación ───────────────────────────────────────────────────
+
+/**
+ * Calcula la tabla de degradación anual del BESS.
+ * Lógica: capacidad año N = capacidadKwh × (1 - tasaDegradacion)^N
+ * Recompra sugerida cuando la capacidad efectiva cae por debajo del umbral
+ * necesario para cubrir la punta completa (se usa potenciaKw × horasPunta como proxy).
+ */
+export function calcularDegradacion(
+  capacidadKwh: number,
+  ahorroAnualBase: number,
+  aniosProyeccion: number,
+  tasaDegradacion = 0.02,
+  ciclosAnuales = 300,
+  umbralRecompraPct = 0.70,
+  tasaCrecimiento = TASA_CRECIMIENTO_TARIFARIO,
+): FilaDegradacion[] {
+  const filas: FilaDegradacion[] = [];
+
+  for (let anio = 0; anio <= aniosProyeccion; anio++) {
+    const factorCapacidad = Math.pow(1 - tasaDegradacion, anio);
+    const capacidadEfectiva = round2(capacidadKwh * factorCapacidad);
+    const degradacionPct = round2((1 - factorCapacidad) * 100);
+
+    // El ahorro se reduce proporcionalmente a la capacidad restante
+    // y crece por el factor tarifario
+    const factorTarifario = anio === 0 ? 1 : Math.pow(1 + tasaCrecimiento, anio - 1);
+    const ahorroAjustado = anio === 0
+      ? 0
+      : round2(ahorroAnualBase * factorCapacidad * factorTarifario);
+
+    // Recompra sugerida cuando capacidad cae debajo del umbral
+    const requiereRecompra = factorCapacidad < umbralRecompraPct;
+
+    filas.push({
+      anio,
+      capacidadEfectiva,
+      degradacionPct,
+      factorCapacidad: round2(factorCapacidad * 100) / 100,
+      ahorroAjustado,
+      requiereRecompra,
+    });
+  }
+
+  return filas;
+}
+
 // ─── Tabla de inversión ──────────────────────────────────────────────────────
 
 export function generarTablaInversion(
@@ -236,6 +297,7 @@ export function generarTablaInversion(
   inversionMxn: number,
   anios: number,
   tasaCrecimiento = TASA_CRECIMIENTO_TARIFARIO,
+  tasaDegradacion = 0.02,
 ): FilaInversion[] {
   const filas: FilaInversion[] = [];
 
@@ -251,10 +313,10 @@ export function generarTablaInversion(
   let ahorroAcumulado = -inversionMxn;
 
   for (let anio = 1; anio <= anios; anio++) {
-    const ahorroCfe =
-      anio === 1
-        ? ahorroAnualBase
-        : ahorroAnualBase * Math.pow(1 + tasaCrecimiento, anio - 1);
+    // Ahorro base × crecimiento tarifario × factor de degradación
+    const factorTarifario = Math.pow(1 + tasaCrecimiento, anio - 1);
+    const factorCapacidad = Math.pow(1 - tasaDegradacion, anio);
+    const ahorroCfe = ahorroAnualBase * factorTarifario * factorCapacidad;
 
     const ahorroNeto = ahorroCfe;
     ahorroAcumulado += ahorroNeto;
@@ -277,13 +339,13 @@ export function calcularRoiExacto(
   ahorroAnualBase: number,
   inversionMxn: number,
   tasaCrecimiento = TASA_CRECIMIENTO_TARIFARIO,
+  tasaDegradacion = 0.02,
 ): number | null {
   let acumulado = -inversionMxn;
   for (let anio = 1; anio <= 100; anio++) {
-    const ahorro =
-      anio > 1
-        ? ahorroAnualBase * Math.pow(1 + tasaCrecimiento, anio - 1)
-        : ahorroAnualBase;
+    const factorTarifario = Math.pow(1 + tasaCrecimiento, anio - 1);
+    const factorCapacidad = Math.pow(1 - tasaDegradacion, anio);
+    const ahorro = ahorroAnualBase * factorTarifario * factorCapacidad;
     const acumuladoPrev = acumulado;
     acumulado += ahorro;
     if (acumulado >= 0) {
@@ -330,19 +392,42 @@ export function ejecutarModeloFinanciero(
 
   const ahorroAnual = totalRow.ahorroNeto;
 
-  // 5. Tabla de inversión
+  // 5. Leer parámetros de degradación del proyecto
+  const tasaDeg = params.tasaDegradacion ?? 0.02;
+  const ciclosAn = params.ciclosAnuales ?? 300;
+
+  // 6. Tabla de inversión (con degradación)
   const tablaInversion = generarTablaInversion(
     ahorroAnual,
     inversionMxn,
     params.aniosProyeccion,
+    TASA_CRECIMIENTO_TARIFARIO,
+    tasaDeg,
   );
 
-  // 6. ROI
-  const roiExacto = calcularRoiExacto(ahorroAnual, inversionMxn);
+  // 7. Tabla de degradación
+  const degradacion = calcularDegradacion(
+    params.capacidadKwh,
+    ahorroAnual,
+    params.aniosProyeccion,
+    tasaDeg,
+    ciclosAn,
+  );
 
-  // 7. Ahorro total vida útil
+  // 8. ROI (con degradación)
+  const roiExacto = calcularRoiExacto(ahorroAnual, inversionMxn, TASA_CRECIMIENTO_TARIFARIO, tasaDeg);
+
+  // 9. Ahorro total vida útil
   const ultimaFila = tablaInversion[tablaInversion.length - 1];
   const ahorroTotalVidaUtil = ultimaFila.ahorroAcumulado;
+
+  // 10. Año de recompra sugerido
+  const filaRecompra = degradacion.find(f => f.requiereRecompra);
+  const anioRecompra = filaRecompra ? filaRecompra.anio : null;
+
+  // Degradación acumulada total al final de la proyección
+  const ultimaDeg = degradacion[degradacion.length - 1];
+  const degradacionAcumuladaTotal = ultimaDeg ? ultimaDeg.degradacionPct : 0;
 
   return {
     parametros: params,
@@ -358,8 +443,11 @@ export function ejecutarModeloFinanciero(
       pctAhorroNeto: totalRow.pctAhorroNeto,
     },
     tablaInversion,
+    degradacion,
     roiExacto,
     ahorroTotalVidaUtil,
+    anioRecompra,
+    degradacionAcumuladaTotal,
   };
 }
 

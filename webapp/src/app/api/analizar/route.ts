@@ -259,6 +259,8 @@ export async function POST(req: NextRequest) {
         region: proyecto.region,
         eficiencia: proyecto.eficiencia,
         horasCargaBase: proyecto.horasCargaBase,
+        tasaDegradacion: proyecto.tasaDegradacion,
+        ciclosAnuales: proyecto.ciclosAnuales,
       };
 
       log.log(`=== MODELO FINANCIERO ===`);
