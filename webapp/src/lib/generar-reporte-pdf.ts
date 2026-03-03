@@ -482,6 +482,8 @@ function renderIndiceContent(doc: jsPDF, pageMap: Record<string, number>): void 
     { num: '4.', titulo: 'Desplazamiento de Carga', pagina: p('4. Desplazamiento'), main: true },
     { num: '5.', titulo: 'Simulación de Ahorros', pagina: p('5. Simulación'), main: true },
     { num: '6.', titulo: 'Inversión de Capital', pagina: p('6. Inversión'), main: true },
+    { num: '  6.1', titulo: 'Flujo de Caja Acumulado', pagina: p('6. Inversión'), main: false },
+    { num: '  6.2', titulo: 'Proyección Anual', pagina: p('6. Inversión'), main: false },
     { num: '7.', titulo: 'Degradación y Recompra', pagina: p('7. Degradación'), main: true },
     { num: '8.', titulo: 'Alcance, Supuestos y Próximos Pasos', pagina: p('8. Alcance'), main: true },
   ];
@@ -1016,6 +1018,51 @@ function renderDesplazamientoCarga(
     return;
   }
 
+  // ── Visual: Antes vs Después ──
+  const totalRow = dc.find((f) => f.periodo === 'TOTAL') || dc[dc.length - 1];
+  if (totalRow) {
+    y = subHeader(doc, 'Impacto del Desplazamiento', y);
+    const maxVal = Math.max(totalRow.consumoPuntaOriginal, totalRow.consumoBaseNuevo, 1);
+    const barMaxW = CONTENT_W - 70;
+
+    // Punta Original
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    doc.text('Consumo Punta (antes)', MARGIN, y + 3);
+    const puntaW = (totalRow.consumoPuntaOriginal / maxVal) * barMaxW;
+    doc.setFillColor(ACCENT_RED[0], ACCENT_RED[1], ACCENT_RED[2]);
+    doc.roundedRect(MARGIN + 55, y - 1, Math.max(puntaW, 1), 6, 1, 1, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${fmtInt(totalRow.consumoPuntaOriginal)} kWh`, MARGIN + 57 + Math.max(puntaW, 1), y + 3);
+    y += 10;
+
+    // Punta Nuevo
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Consumo Punta (después)', MARGIN, y + 3);
+    const puntaNW = (totalRow.consumoPuntaNuevo / maxVal) * barMaxW;
+    doc.setFillColor(ACCENT_EMERALD[0], ACCENT_EMERALD[1], ACCENT_EMERALD[2]);
+    doc.roundedRect(MARGIN + 55, y - 1, Math.max(puntaNW, 1), 6, 1, 1, 'F');
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${fmtInt(totalRow.consumoPuntaNuevo)} kWh`, MARGIN + 57 + Math.max(puntaNW, 1), y + 3);
+    y += 10;
+
+    // Etiqueta de reducción
+    const reduction = totalRow.consumoPuntaOriginal - totalRow.consumoPuntaNuevo;
+    const reductionPct = totalRow.consumoPuntaOriginal > 0 ? (reduction / totalRow.consumoPuntaOriginal) * 100 : 0;
+    doc.setFillColor(230, 255, 230);
+    doc.roundedRect(MARGIN + 55, y - 2, 70, 8, 2, 2, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(ACCENT_EMERALD[0], ACCENT_EMERALD[1], ACCENT_EMERALD[2]);
+    doc.text(`Reducción: ${fmtInt(reduction)} kWh (${reductionPct.toFixed(0)}%)`, MARGIN + 58, y + 3);
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+    y += 15;
+  }
+
   // Tabla de consumos (kWh)
   y = subHeader(doc, '4.1 Consumo — Desplazamiento (kWh)', y);
 
@@ -1143,6 +1190,32 @@ function renderSimulacionAhorros(
 
   y = ((doc as any).lastAutoTable?.finalY || y + 40) + 8;
 
+  // ── Callout de Ahorro Neto ──
+  const calloutH = 20;
+  doc.setFillColor(230, 255, 230);
+  doc.setDrawColor(ACCENT_EMERALD[0], ACCENT_EMERALD[1], ACCENT_EMERALD[2]);
+  doc.setLineWidth(0.6);
+  doc.roundedRect(MARGIN, y, CONTENT_W, calloutH, 3, 3, 'FD');
+  drawCheckIcon(doc, MARGIN + 5, y + 4, 4);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(ACCENT_EMERALD[0], ACCENT_EMERALD[1], ACCENT_EMERALD[2]);
+  doc.text('AHORRO NETO ANUAL ESTIMADO', MARGIN + 13, y + 8);
+  doc.setFontSize(14);
+  doc.text(fmt(resultados.totales.ahorroNeto) + ' MXN', MARGIN + 13, y + 16);
+  const costoAnual = resultados.estructuraCostos?.costoAnualTotal || 0;
+  if (costoAnual > 0) {
+    const pctDelCosto = ((resultados.totales.ahorroNeto / costoAnual) * 100).toFixed(1);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    doc.text(`Equivalente al ${pctDelCosto}% del costo eléctrico anual`, MARGIN + CONTENT_W / 2, y + 8);
+  }
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
+  doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+  y += calloutH + 8;
+
   // Comparativo mensual
   y = subHeader(doc, '5.3 Comparativo Mensual Punta', y);
 
@@ -1186,7 +1259,24 @@ function renderInversionCapital(
   doc.text('6. Inversión de Capital', PAGE_W / 2, 16, { align: 'center' });
 
   let y = 35;
-  y = subHeader(doc, `Proyección a ${resultados.parametros.aniosProyeccion} años`, y);
+
+  // ── 6.1 Gráfico de Flujo de Caja Acumulado ──
+  y = subHeader(doc, '6.1 Flujo de Caja Acumulado', y);
+  const roiIdx = resultados.tablaInversion.findIndex(
+    (f) => f.ahorroAcumulado >= 0 && f.anio > 0,
+  );
+  const chartData = resultados.tablaInversion.map((f) => ({
+    label: `Año ${f.anio}`,
+    value: f.ahorroAcumulado,
+  }));
+  y = drawHorizontalBarChart(doc, MARGIN, y, CONTENT_W, chartData, {
+    zeroLine: true,
+    roiYear: roiIdx >= 0 ? roiIdx : null,
+  });
+  y += 5;
+
+  // ── 6.2 Tabla de Detalle Anual ──
+  y = subHeader(doc, `6.2 Proyección a ${resultados.parametros.aniosProyeccion} años`, y);
 
   autoTable(doc, {
     startY: y,
@@ -1329,6 +1419,46 @@ function renderDegradacion(
   doc.setFont('helvetica', 'normal');
   doc.text(`• Tasa de degradación: ${tasa.toFixed(1)}% anual`, MARGIN + 5, y + 15);
   doc.text(`• Ciclos anuales: ${ciclos}  •  Modelo: Degradación lineal (1−tasa)^N`, MARGIN + 5, y + 21);
+
+  // ── 7.3 Visualización de Degradación ──
+  if (deg.length >= 2) {
+    doc.addPage();
+    pageHeader(doc);
+    doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('7. Degradación y Recompra (cont.)', PAGE_W / 2, 16, { align: 'center' });
+
+    let vy = 38;
+    vy = subHeader(doc, '7.3 Curva de Capacidad a lo Largo del Tiempo', vy);
+
+    const lineData = deg.map(d => ({ x: d.anio, y: d.capacidadEfectiva }));
+    const umbralPct = resultados.parametros.umbralRecompra || 0.7;
+    const umbralKwh = resultados.parametros.capacidadKwh * umbralPct;
+    drawLineChart(doc, MARGIN + 15, vy, CONTENT_W - 30, 60, lineData, {
+      yLabel: 'kWh',
+      thresholdY: umbralKwh,
+      lineColor: BRAND,
+    });
+    vy += 75;
+
+    // Gauge de degradación total
+    vy = subHeader(doc, '7.4 Degradación Acumulada', vy);
+    const degradTotal = resultados.degradacionAcumuladaTotal || 0;
+    drawProgressGauge(doc, PAGE_W / 2, vy + 22, 20, degradTotal, 'Degradación Total');
+    vy += 55;
+
+    // Nota explicativa
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    doc.text(
+      'La línea roja punteada indica el umbral mínimo de capacidad para cubrir la demanda punta completa.',
+      PAGE_W / 2, vy, { align: 'center' },
+    );
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+  }
 }
 
 function renderAlcanceSupuestos(
@@ -1399,21 +1529,32 @@ function renderAlcanceSupuestos(
 
   y += 8;
 
-  // Conclusión Final
+  // Conclusión Final + Beneficios Estratégicos
   y = sectionHeader(doc, 'Conclusión Final', y);
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
 
+  // 3 métricas destacadas
+  const metricW = (CONTENT_W - 12) / 3;
+  const metricH = 24;
   const cap = resultados.parametros.capacidadKwh;
   const reduccionPct = resultados.totales.pctAhorroNeto || 0;
   const ahorroAnual = resultados.totales.ahorroNeto || 0;
 
-  const conclusiones = [
-    `El sistema BESS de ${fmtInt(cap)} kWh propuesto permite:`,
-  ];
-  const splitConc = doc.splitTextToSize(conclusiones[0], CONTENT_W);
-  doc.text(splitConc, MARGIN, y);
-  y += splitConc.length * 5 + 3;
+  drawKPICard(doc, MARGIN, y, metricW, metricH,
+    'ROI', resultados.roiExacto ? `${resultados.roiExacto} años` : 'N/A', BRAND);
+  drawKPICard(doc, MARGIN + metricW + 6, y, metricW, metricH,
+    'Ahorro Anual', fmt(ahorroAnual), ACCENT_EMERALD);
+  drawKPICard(doc, MARGIN + (metricW + 6) * 2, y, metricW, metricH,
+    'Vida Útil', fmt(resultados.ahorroTotalVidaUtil), ACCENT_GREEN);
+  y += metricH + 8;
+
+  // Beneficios directos con check icons
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(BRAND[0], BRAND[1], BRAND[2]);
+  doc.text(`El sistema BESS de ${fmtInt(cap)} kWh propuesto permite:`, MARGIN, y);
+  y += 7;
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(DARK[0], DARK[1], DARK[2]);
 
   const checks = [
     `Reducir el cargo por capacidad en ~${reduccionPct.toFixed(0)}%`,
@@ -1423,15 +1564,52 @@ function renderAlcanceSupuestos(
       ? `Recuperar la inversión en ${resultados.roiExacto} años`
       : 'Inversión recuperable dentro del horizonte proyectado',
   ];
-
   checks.forEach((check) => {
-    doc.text(`-  ${check}`, MARGIN + 3, y);
-    y += 6;
+    drawCheckIcon(doc, MARGIN + 2, y - 2.5, 3);
+    doc.setFontSize(9);
+    doc.text(check, MARGIN + 8, y);
+    y += 7;
   });
 
   y += 5;
+
+  // Beneficios Estratégicos
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('Bajo las condiciones actuales, el proyecto es técnica y financieramente viable.', MARGIN, y);
+  doc.setTextColor(BRAND[0], BRAND[1], BRAND[2]);
+  doc.text('Beneficios Estratégicos:', MARGIN, y);
+  y += 7;
+  doc.setTextColor(DARK[0], DARK[1], DARK[2]);
+
+  const beneficios = [
+    'Mayor estabilidad operativa',
+    'Protección ante incremento tarifario',
+    'Integración futura con sistema solar',
+    'Mejora en indicadores ESG',
+    'Reducción de exposición a riesgo energético',
+  ];
+  beneficios.forEach((b) => {
+    drawCheckIcon(doc, MARGIN + 2, y - 2.5, 3);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(b, MARGIN + 8, y);
+    y += 7;
+  });
+
+  y += 5;
+
+  // Statement final en caja destacada
+  const stmtH = 14;
+  doc.setFillColor(BRAND[0], BRAND[1], BRAND[2]);
+  doc.roundedRect(MARGIN, y, CONTENT_W, stmtH, 3, 3, 'F');
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.text(
+    'Bajo las condiciones actuales, el proyecto es técnica y financieramente viable.',
+    PAGE_W / 2, y + stmtH / 2 + 1, { align: 'center' },
+  );
+  doc.setTextColor(DARK[0], DARK[1], DARK[2]);
 }
 
 // ─── Función principal ──────────────────────────────────────────────────────
