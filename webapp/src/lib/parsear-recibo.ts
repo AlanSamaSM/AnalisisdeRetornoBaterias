@@ -481,30 +481,58 @@ function extraerCargoEnergiaBase(texto: string): number {
  * Extrae el importe total a pagar del recibo CFE.
  * Busca patrones como "Total a pagar $29,199,653.00" o
  * "TOTAL    29,199,653.00" al final de la tabla de costos.
+ * Si solo se encuentra SUBTOTAL (pre-IVA), se agrega 16% IVA automáticamente.
  */
 function extraerImporteTotal(texto: string): number {
-  const patrones = [
-    // "Total a Pagar  $29,199,653.00" or "Total a Pagar 29,199,653.00"
-    /Total\s+a\s+[Pp]agar\s*\$?\s*([\d,]+\.\d{2})/i,
+  // --- Grupo 1: patrones que capturan el TOTAL CON IVA ---
+  const patronesTotal = [
+    // "Total a Pagar  $29,199,653.00" — flexible whitespace/newlines
+    /Total\s+a\s+[Pp]agar[\s:]*\$?\s*([\d,]+\.\d{2})/i,
+    // "Cantidad a pagar  29,199,653.00"
+    /Cantidad\s+a\s+[Pp]agar[\s:]*\$?\s*([\d,]+\.\d{2})/i,
+    // "Monto total  29,199,653.00"
+    /[Mm]onto\s+[Tt]otal[\s:]*\$?\s*([\d,]+\.\d{2})/i,
     // "TOTAL  $29,199,653.00"
     /TOTAL\s+\$\s*([\d,]+\.\d{2})/i,
     // "Importe total  29,199,653.00"
-    /[Ii]mporte\s+[Tt]otal\s*\$?\s*([\d,]+\.\d{2})/i,
+    /[Ii]mporte\s+[Tt]otal[\s:]*\$?\s*([\d,]+\.\d{2})/i,
     // "Total del periodo  29,199,653.00"
-    /Total\s+del\s+per[ií]odo\s*\$?\s*([\d,]+\.\d{2})/i,
-    // "SUBTOTAL" — some receipts use this as the energy total line
-    /SUBTOTAL\s*\$?\s*([\d,]+\.\d{2})/i,
+    /Total\s+del\s+per[ií]odo[\s:]*\$?\s*([\d,]+\.\d{2})/i,
     // Generic: "Total" at start of line followed by a large number
     /^Total\s+([\d,]+\.\d{2})\s*$/im,
   ];
-  for (const re of patrones) {
+  for (const re of patronesTotal) {
     const m = texto.match(re);
     if (m) {
       const val = parseFloat(m[1].replace(/,/g, ''));
-      // Sanity: total should be a significant amount
       if (val > 1000) return Math.round(val * 100) / 100;
     }
   }
+
+  // --- Grupo 2: SUBTOTAL (pre-IVA) + agregar IVA 16% ---
+  const subM = texto.match(/SUBTOTAL[\s:]*\$?\s*([\d,]+\.\d{2})/i);
+  if (subM) {
+    const subtotal = parseFloat(subM[1].replace(/,/g, ''));
+    if (subtotal > 1000) {
+      // Intentar encontrar IVA explícito en el texto
+      const ivaPatrones = [
+        /IVA\s*(?:16\s*%?\s*)?[\s:]*\$?\s*([\d,]+\.\d{2})/i,
+        /I\.?\s*V\.?\s*A\.?\s*[\s:]*\$?\s*([\d,]+\.\d{2})/i,
+      ];
+      for (const ivaRe of ivaPatrones) {
+        const ivaM = texto.match(ivaRe);
+        if (ivaM) {
+          const iva = parseFloat(ivaM[1].replace(/,/g, ''));
+          if (iva > 0 && iva < subtotal) {
+            return Math.round((subtotal + iva) * 100) / 100;
+          }
+        }
+      }
+      // Si no se encontró IVA explícito, aplicar 16% estándar (tarifa GDMTH México)
+      return Math.round(subtotal * 1.16 * 100) / 100;
+    }
+  }
+
   return 0;
 }
 

@@ -319,6 +319,7 @@ export async function POST(req: NextRequest) {
           );
 
           log.log(`Modelo ejecutado exitosamente`);
+          log.log(`  Costo eléctrico anual (costoAnualTotal): $${resultadoFinanciero.estructuraCostos?.costoAnualTotal?.toLocaleString() ?? 'N/A'}`);
           log.log(`  Inversión MXN: $${resultadoFinanciero.inversionMxn.toLocaleString()}`);
           log.log(`  Ahorro neto anual: $${resultadoFinanciero.totales.ahorroNeto.toLocaleString()}`);
           log.log(`  Ahorro capacidad: $${resultadoFinanciero.totales.ahorroCapacidad.toLocaleString()}`);
