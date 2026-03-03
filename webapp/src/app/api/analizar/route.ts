@@ -261,6 +261,7 @@ export async function POST(req: NextRequest) {
         horasCargaBase: proyecto.horasCargaBase,
         tasaDegradacion: proyecto.tasaDegradacion,
         ciclosAnuales: proyecto.ciclosAnuales,
+        umbralRecompra: (proyecto as any).umbralRecompra ?? 0.70,
       };
 
       log.log(`=== MODELO FINANCIERO ===`);

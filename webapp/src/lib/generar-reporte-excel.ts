@@ -136,10 +136,9 @@ function sheetEstructuraCostos(wb: ExcelJS.Workbook, resultados: ResultadoFinanc
 
   const data = [
     ['Cargos por Capacidad', ec.capacidad.total, ec.capacidad.pct],
-    ['Energía Punta', ec.energiaPunta.total, ec.energiaPunta.pct],
-    ['Energía Intermedia', ec.energiaIntermedia.total, ec.energiaIntermedia.pct],
-    ['Energía Base', ec.energiaBase.total, ec.energiaBase.pct],
-    ['Distribución', ec.distribucion.total, ec.distribucion.pct],
+    ['Energia Punta', ec.energiaPunta.total, ec.energiaPunta.pct],
+    ['Energia Intermedia', ec.energiaIntermedia.total, ec.energiaIntermedia.pct],
+    ['Energia Base', ec.energiaBase.total, ec.energiaBase.pct],
   ];
 
   data.forEach((d) => {

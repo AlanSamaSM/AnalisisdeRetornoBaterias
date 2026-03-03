@@ -12,7 +12,6 @@ export default function NuevoProyectoPage() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     nombre: '',
-    cliente: '',
     region: 'NORTE',
     potenciaKw: '',
     capacidadKwh: '',
@@ -34,6 +33,7 @@ export default function NuevoProyectoPage() {
     // Degradación
     tasaDegradacion: '2',
     ciclosAnuales: '300',
+    umbralRecompra: '70',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,7 +45,6 @@ export default function NuevoProyectoPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: form.nombre,
-        cliente: form.cliente,
         region: form.region,
         potenciaKw: parseFloat(form.potenciaKw) || 0,
         capacidadKwh: parseFloat(form.capacidadKwh) || 0,
@@ -64,6 +63,7 @@ export default function NuevoProyectoPage() {
         preparadoPor: form.preparadoPor,
         tasaDegradacion: (parseFloat(form.tasaDegradacion) || 2) / 100,
         ciclosAnuales: parseInt(form.ciclosAnuales) || 300,
+        umbralRecompra: (parseFloat(form.umbralRecompra) || 70) / 100,
       }),
     });
 
@@ -107,18 +107,6 @@ export default function NuevoProyectoPage() {
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                   className={inputClass}
                   placeholder="Mi Proyecto BESS"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">
-                  Cliente
-                </label>
-                <input
-                  type="text"
-                  value={form.cliente}
-                  onChange={(e) => setForm({ ...form, cliente: e.target.value })}
-                  className={inputClass}
-                  placeholder="Empresa del cliente"
                 />
               </div>
             </div>
@@ -407,6 +395,23 @@ export default function NuevoProyectoPage() {
                   onChange={(e) => setForm({ ...form, ciclosAnuales: e.target.value })}
                   className={inputClass}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-600 mb-1">
+                  Umbral de recompra (%)
+                </label>
+                <input
+                  type="number"
+                  min="50"
+                  max="95"
+                  step="1"
+                  value={form.umbralRecompra}
+                  onChange={(e) => setForm({ ...form, umbralRecompra: e.target.value })}
+                  className={inputClass}
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Porcentaje mínimo de capacidad original. Cuando la batería degrada por debajo de este umbral, se sugiere recompra.
+                </p>
               </div>
             </div>
           </section>

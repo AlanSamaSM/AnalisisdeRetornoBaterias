@@ -57,6 +57,7 @@ model Proyecto {
   preparadoPor        String  @default("")
   tasaDegradacion     Float   @default(0.02)
   ciclosAnuales       Int     @default(300)
+  umbralRecompra      Float   @default(0.70)
 
   // Resultados calculados (JSON serializado) - PostgreSQL TEXT no tiene límite de tamaño
   resultadosJson String?

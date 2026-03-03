@@ -435,13 +435,12 @@ export default function ProyectoPage() {
                     {fmt(resultados.estructuraCostos.costoAnualTotal)} MXN
                   </span>
                 </p>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {[
                     { label: 'Capacidad',      ...resultados.estructuraCostos.capacidad,          color: 'bg-red-50 border-red-200 text-red-800' },
                     { label: 'Energía Punta',   ...resultados.estructuraCostos.energiaPunta,       color: 'bg-orange-50 border-orange-200 text-orange-800' },
                     { label: 'Energía Intermedia', ...resultados.estructuraCostos.energiaIntermedia, color: 'bg-amber-50 border-amber-200 text-amber-800' },
                     { label: 'Energía Base',    ...resultados.estructuraCostos.energiaBase,        color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
-                    { label: 'Distribución',    ...resultados.estructuraCostos.distribucion,       color: 'bg-blue-50 border-blue-200 text-blue-800' },
                   ].map((item) => (
                     <div key={item.label} className={`rounded-xl border p-4 ${item.color}`}>
                       <p className="text-xs font-medium uppercase tracking-wide opacity-70">

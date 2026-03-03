@@ -11,7 +11,6 @@ import type { ResultadoFinanciero } from './modelo-financiero';
 
 export interface DatosProyecto {
   nombre: string;
-  cliente?: string;
   estado?: string;
   municipio?: string;
   tarifa?: string;
@@ -80,16 +79,28 @@ function renderPortada(doc: jsPDF, proyecto: DatosProyecto): void {
   doc.setTextColor(WHITE[0], WHITE[1], WHITE[2]);
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
-  doc.text('ESTUDIO TÉCNICO–ECONÓMICO', PAGE_W / 2, 55, { align: 'center' });
+  doc.text('ESTUDIO TECNICO-ECONOMICO', PAGE_W / 2, 55, { align: 'center' });
 
   doc.setFontSize(16);
   doc.setFont('helvetica', 'normal');
-  doc.text('Sistema híbrido de Almacenamiento', PAGE_W / 2, 70, { align: 'center' });
-  doc.text('de Energía (BESS)', PAGE_W / 2, 80, { align: 'center' });
+  doc.text('Sistema hibrido de Almacenamiento', PAGE_W / 2, 70, { align: 'center' });
+  doc.text('de Energia (BESS)', PAGE_W / 2, 80, { align: 'center' });
 
-  // Icono batería texto
-  doc.setFontSize(40);
-  doc.text('⚡', PAGE_W / 2, 105, { align: 'center' });
+  // Icono batería dibujado con primitivas
+  const bx = PAGE_W / 2 - 10;
+  const by = 90;
+  doc.setFillColor(0, 180, 120);
+  doc.roundedRect(bx, by, 20, 14, 2, 2, 'F');
+  doc.setFillColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.rect(bx + 20, by + 4, 3, 6, 'F');
+  // Rayo interior
+  doc.setDrawColor(WHITE[0], WHITE[1], WHITE[2]);
+  doc.setLineWidth(1.5);
+  doc.line(bx + 12, by + 2, bx + 8, by + 7);
+  doc.line(bx + 8, by + 7, bx + 13, by + 7);
+  doc.line(bx + 13, by + 7, bx + 9, by + 12);
+  doc.setLineWidth(0.2);
+  doc.setDrawColor(0, 0, 0);
 
   // Datos del proyecto
   let y = 150;
@@ -102,14 +113,6 @@ function renderPortada(doc: jsPDF, proyecto: DatosProyecto): void {
   doc.text(proyecto.nombre || 'Sin nombre', MARGIN + 28, y);
 
   y += 12;
-  if (proyecto.cliente) {
-    doc.setFont('helvetica', 'bold');
-    doc.text('Cliente:', MARGIN, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(proyecto.cliente, MARGIN + 23, y);
-    y += 12;
-  }
-
   if (proyecto.integrador) {
     doc.setFont('helvetica', 'bold');
     doc.text('Integrador:', MARGIN, y);
@@ -349,7 +352,11 @@ function renderSituacionEnergetica(
   const consumoAnual = recibos.reduce((s: number, r: any) => s + (r.totalConsumo || 0), 0);
   const consumos = recibos.map((r: any) => ({ mes: r.mes, total: r.totalConsumo || 0 }));
   const mesMayor = consumos.reduce((a: any, b: any) => (b.total > a.total ? b : a), consumos[0] || { mes: '-', total: 0 });
-  const mesMenor = consumos.reduce((a: any, b: any) => (b.total < a.total ? b : a), consumos[0] || { mes: '-', total: 0 });
+  // Excluir meses con consumo 0 para determinar el menor
+  const consumosValidos = consumos.filter((c: any) => c.total > 0);
+  const mesMenor = consumosValidos.length > 0
+    ? consumosValidos.reduce((a: any, b: any) => (b.total < a.total ? b : a), consumosValidos[0])
+    : consumos[0] || { mes: '-', total: 0 };
   const promedioMensual = recibos.length > 0 ? consumoAnual / recibos.length : 0;
 
   autoTable(doc, {
@@ -410,10 +417,9 @@ function renderSituacionEnergetica(
       head: [['Componente', 'Monto', '% del Total']],
       body: [
         ['Cargos por capacidad', fmt(ec.capacidad.total), `${ec.capacidad.pct}%`],
-        ['Energía punta', fmt(ec.energiaPunta.total), `${ec.energiaPunta.pct}%`],
-        ['Energía intermedia', fmt(ec.energiaIntermedia.total), `${ec.energiaIntermedia.pct}%`],
-        ['Energía base', fmt(ec.energiaBase.total), `${ec.energiaBase.pct}%`],
-        ['Distribución', fmt(ec.distribucion.total), `${ec.distribucion.pct}%`],
+        ['Energia punta', fmt(ec.energiaPunta.total), `${ec.energiaPunta.pct}%`],
+        ['Energia intermedia', fmt(ec.energiaIntermedia.total), `${ec.energiaIntermedia.pct}%`],
+        ['Energia base', fmt(ec.energiaBase.total), `${ec.energiaBase.pct}%`],
       ],
       theme: 'grid',
       styles: { fontSize: 9, cellPadding: 3 },
@@ -421,6 +427,20 @@ function renderSituacionEnergetica(
       columnStyles: { 0: { fontStyle: 'bold', cellWidth: 60 }, 1: { halign: 'right' }, 2: { halign: 'center' } },
       margin: { left: MARGIN, right: MARGIN },
     });
+
+    // Descripción de componentes
+    const tblCostY = (doc as any).lastAutoTable?.finalY || y + 40;
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(GRAY[0], GRAY[1], GRAY[2]);
+    const descCostos = 'Capacidad: Cargo por demanda maxima medida en punta. '
+      + 'Energia Punta: Costo del kWh consumido en horario punta. '
+      + 'Energia Intermedia: Costo del kWh en horario intermedio. '
+      + 'Energia Base: Costo del kWh en horario base.';
+    const splitDesc = doc.splitTextToSize(descCostos, CONTENT_W);
+    doc.text(splitDesc, MARGIN, tblCostY + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(DARK[0], DARK[1], DARK[2]);
   }
 }
 
@@ -662,7 +682,7 @@ function renderSimulacionAhorros(
   y = ((doc as any).lastAutoTable?.finalY || y + 40) + 8;
 
   // Comparativo mensual
-  y = subHeader(doc, '5.3 Comparativo Mensual', y);
+  y = subHeader(doc, '5.3 Comparativo Mensual Punta', y);
 
   autoTable(doc, {
     startY: y,
@@ -908,7 +928,7 @@ function renderAlcanceSupuestos(
     'Validación técnica en sitio',
     'Ingeniería de detalle',
     'Cotización final cerrada',
-    'Cronograma de implementación (4–6 meses)',
+    'Cronograma de implementacion (4-6 meses)',
   ];
   pasos.forEach((paso, i) => {
     doc.text(`${i + 1}. ${paso}`, MARGIN + 3, y);
@@ -935,15 +955,15 @@ function renderAlcanceSupuestos(
 
   const checks = [
     `Reducir el cargo por capacidad en ~${reduccionPct.toFixed(0)}%`,
-    'Desplazar energía de alto costo (punta → base)',
+    'Desplazar energia de alto costo (punta a base)',
     `Generar un ahorro anual de ${fmt(ahorroAnual)} MXN`,
     resultados.roiExacto
-      ? `Recuperar la inversión en ${resultados.roiExacto} años`
-      : 'Inversión recuperable dentro del horizonte proyectado',
+      ? `Recuperar la inversion en ${resultados.roiExacto} anos`
+      : 'Inversion recuperable dentro del horizonte proyectado',
   ];
 
   checks.forEach((check) => {
-    doc.text(`✓  ${check}`, MARGIN + 3, y);
+    doc.text(`-  ${check}`, MARGIN + 3, y);
     y += 6;
   });
 

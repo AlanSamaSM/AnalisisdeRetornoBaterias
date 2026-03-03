@@ -31,7 +31,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     nombre,
-    cliente,
     estado,
     municipio,
     region,
@@ -52,6 +51,7 @@ export async function POST(req: NextRequest) {
     preparadoPor,
     tasaDegradacion,
     ciclosAnuales,
+    umbralRecompra,
   } = body;
 
   if (!nombre) {
@@ -60,7 +60,6 @@ export async function POST(req: NextRequest) {
 
   // Input validation — cap string lengths and validate numeric ranges
   const safeName = String(nombre).substring(0, 200);
-  const safeCliente = String(cliente || '').substring(0, 200);
   const safeEstado = String(estado || '').substring(0, 100);
   const safeMunicipio = String(municipio || '').substring(0, 100);
   const safeRegion = ['NORTE', 'CENTRAL', 'BAJA CALIFORNIA SUR'].includes(region) ? region : 'NORTE';
@@ -74,7 +73,6 @@ export async function POST(req: NextRequest) {
   const proyecto = await prisma.proyecto.create({
     data: {
       nombre: safeName,
-      cliente: safeCliente,
       estado: safeEstado,
       municipio: safeMunicipio,
       region: safeRegion,
@@ -95,6 +93,7 @@ export async function POST(req: NextRequest) {
       preparadoPor: String(preparadoPor || '').substring(0, 200),
       tasaDegradacion: numVal(tasaDegradacion, 0, 0.10, 0.02),
       ciclosAnuales: numVal(ciclosAnuales, 1, 1000, 300),
+      umbralRecompra: numVal(umbralRecompra, 0.50, 0.95, 0.70),
       userId,
     },
   });

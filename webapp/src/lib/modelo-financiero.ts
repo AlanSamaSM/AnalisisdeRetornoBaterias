@@ -34,6 +34,7 @@ export interface ParametrosBESS {
   horasCargaBase: number;
   tasaDegradacion?: number;
   ciclosAnuales?: number;
+  umbralRecompra?: number;
 }
 
 export interface FilaSimulacion {
@@ -379,6 +380,57 @@ export function calcularRoiExacto(
   return null;
 }
 
+// ─── Rellenar meses vacíos con promedios ────────────────────────────────────
+
+/**
+ * Detecta recibos vacíos (totalConsumo === 0 y demandas === 0) y los rellena
+ * con el promedio de los meses válidos. Marca el mes con "(P)" para indicar
+ * que fue promediado. Esto evita que meses en blanco distorsionen totales.
+ */
+export function rellenarMesesVacios(recibos: ReciboData[]): ReciboData[] {
+  const camposNumericos: (keyof ReciboData)[] = [
+    'consumoPunta', 'consumoIntermedia', 'consumoBase', 'totalConsumo',
+    'demandaPunta', 'demandaIntermedia', 'demandaBase', 'demandaMaxima',
+    'factorCarga', 'factorPotencia',
+    'cargoCapacidadRecibo', 'cargoDistribucion',
+    'cargoEnergiaPunta', 'cargoEnergiaIntermedia', 'cargoEnergiaBase',
+    'importeTotal',
+  ];
+
+  // Identificar recibos vacíos: totalConsumo === 0 AND todas las demandas === 0
+  const esVacio = (r: ReciboData): boolean =>
+    (r.totalConsumo === 0 || !r.totalConsumo) &&
+    (r.demandaPunta === 0 || !r.demandaPunta) &&
+    (r.demandaIntermedia === 0 || !r.demandaIntermedia) &&
+    (r.demandaBase === 0 || !r.demandaBase);
+
+  const validos = recibos.filter(r => !esVacio(r));
+  const vacios = recibos.filter(r => esVacio(r));
+
+  if (vacios.length === 0 || validos.length === 0) return recibos;
+
+  // Calcular promedios de los meses válidos
+  const promedios: Record<string, number> = {};
+  for (const campo of camposNumericos) {
+    const suma = validos.reduce((s, r) => s + (Number(r[campo]) || 0), 0);
+    promedios[campo] = round2(suma / validos.length);
+  }
+
+  // Rellenar vacíos con promedios y marcar mes con "(P)"
+  return recibos.map(r => {
+    if (!esVacio(r)) return r;
+    const relleno = { ...r };
+    for (const campo of camposNumericos) {
+      (relleno as any)[campo] = promedios[campo];
+    }
+    // Marcar el mes como promediado
+    if (!relleno.mes.includes('(P)')) {
+      relleno.mes = `${relleno.mes} (P)`;
+    }
+    return relleno;
+  });
+}
+
 // ─── Pipeline completo ───────────────────────────────────────────────────────
 
 export function ejecutarModeloFinanciero(
@@ -388,14 +440,17 @@ export function ejecutarModeloFinanciero(
   estado: string,
   municipio: string,
 ): ResultadoFinanciero {
+  // 0. Rellenar meses vacíos con promedios
+  const recibosCompletos = rellenarMesesVacios(recibos);
+
   const inversionMxn = params.precioUsd * params.tipoCambio;
 
   // 1. Calcular cargos de capacidad
-  const cargos = calcularCargosCapacidad(recibos, tarifas, estado, municipio);
+  const cargos = calcularCargosCapacidad(recibosCompletos, tarifas, estado, municipio);
 
   // 2. Construir mapa de consumo BASE
   const consumoBaseMap: Record<string, number> = {};
-  recibos.forEach((r) => {
+  recibosCompletos.forEach((r) => {
     consumoBaseMap[r.mes.trim().toUpperCase()] = r.consumoBase;
   });
 
@@ -418,6 +473,7 @@ export function ejecutarModeloFinanciero(
   // 5. Leer parámetros de degradación del proyecto
   const tasaDeg = params.tasaDegradacion ?? 0.02;
   const ciclosAn = params.ciclosAnuales ?? 300;
+  const umbralRecompra = params.umbralRecompra ?? 0.70;
 
   // 6. Tabla de inversión (con degradación)
   const tablaInversion = generarTablaInversion(
@@ -435,6 +491,7 @@ export function ejecutarModeloFinanciero(
     params.aniosProyeccion,
     tasaDeg,
     ciclosAn,
+    umbralRecompra,
   );
 
   // 8. ROI (con degradación)
@@ -453,10 +510,10 @@ export function ejecutarModeloFinanciero(
   const degradacionAcumuladaTotal = ultimaDeg ? ultimaDeg.degradacionPct : 0;
 
   // 11. Estructura de costos
-  const estructuraCostos = calcularEstructuraCostos(recibos);
+  const estructuraCostos = calcularEstructuraCostos(recibosCompletos);
 
   // 12. Desplazamiento de carga
-  const desplazamientoCarga = generarDesplazamientoCarga(simulacion, recibos);
+  const desplazamientoCarga = generarDesplazamientoCarga(simulacion, recibosCompletos);
 
   return {
     parametros: params,
