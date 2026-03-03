@@ -46,6 +46,18 @@ model Proyecto {
   eficiencia     Float    @default(0.90)
   horasCargaBase Int      @default(6)
 
+  // Especificaciones del equipo BESS
+  marcaBess           String  @default("")
+  modeloBess          String  @default("")
+  tecnologiaBess      String  @default("LFP")
+  vidaUtilAnios       Int     @default(15)
+  garantiaAnios       Int     @default(5)
+  capacidadContratada Float   @default(0)
+  integrador          String  @default("")
+  preparadoPor        String  @default("")
+  tasaDegradacion     Float   @default(0.02)
+  ciclosAnuales       Int     @default(300)
+
   // Resultados calculados (JSON serializado) - PostgreSQL TEXT no tiene límite de tamaño
   resultadosJson String?
 
