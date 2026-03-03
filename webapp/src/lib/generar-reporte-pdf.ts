@@ -261,14 +261,13 @@ function renderResumenEjecutivo(
     Math.max(max, r.demandaPunta || 0, r.demandaIntermedia || 0), 0);
   const costoAnual = resultados.estructuraCostos?.costoAnualTotal || 0;
   const pctCapPunta = resultados.estructuraCostos?.capacidad?.pct || 0;
-  const consumoPuntaTotal = recibos.reduce((s: number, r: any) => s + (r.consumoPunta || 0), 0);
-  const pctConsumoPunta = consumoAnual > 0 ? (consumoPuntaTotal / consumoAnual * 100).toFixed(1) : '0';
+  const pctEnergiaPunta = resultados.estructuraCostos?.energiaPunta?.pct || 0;
 
   y = bullet(doc, `Consumo anual: ${fmtInt(Math.round(consumoAnual / 1000))} MWh`, y);
   y = bullet(doc, `Demanda máxima registrada: ${fmtInt(demandaMax)} kWp`, y);
   y = bullet(doc, `Costo eléctrico anual: ${fmt(costoAnual)} MXN`, y);
   y = bullet(doc, `${pctCapPunta.toFixed(1)}% de la factura corresponde a cargos por capacidad`, y);
-  y = bullet(doc, `${pctConsumoPunta}% del consumo corresponde a horario punta`, y);
+  y = bullet(doc, `${pctEnergiaPunta.toFixed(1)}% de la factura corresponde a energia punta`, y);
 
   y += 5;
 
