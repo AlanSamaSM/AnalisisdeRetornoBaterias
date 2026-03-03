@@ -79,6 +79,11 @@ model Recibo {
   factorCarga    Float @default(0)
   factorPotencia Float @default(0)
   cargoCapacidadRecibo Float @default(0) // $ importe Capacidad leído del recibo
+  cargoDistribucion Float @default(0)    // $ importe Distribución leído del recibo
+  cargoEnergiaPunta Float @default(0)    // $ importe Energía Punta leído del recibo
+  cargoEnergiaIntermedia Float @default(0) // $ importe Energía Intermedia leído del recibo
+  cargoEnergiaBase Float @default(0)     // $ importe Energía Base leído del recibo
+  importeTotal Float @default(0)         // $ Total a Pagar del recibo CFE
 
   @@unique([proyectoId, mes, anio])
 }

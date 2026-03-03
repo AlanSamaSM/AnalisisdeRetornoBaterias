@@ -324,6 +324,102 @@ function extraerCargoCapacidadRecibo(texto: string): number {
   return 0;
 }
 
+/**
+ * Extrae el importe de "Distribución" ($) de la tabla de costos MEM del recibo CFE.
+ * Ejemplo: "Distribución 0.00 123,456.78 0.00 123,456.78"
+ */
+function extraerCargoDistribucion(texto: string): number {
+  const patrones = [
+    // "Distribución  0.00  123,456.78  0.00  123,456.78" — tomar el último número
+    /Distribuci[oó]n\s+[\d,.]+\s+([\d,]+\.\d{2})\s+[\d,.]+\s+([\d,]+\.\d{2})/i,
+    // "Distribución" seguido de valor
+    /Distribuci[oó]n\s+[\d,.]+\s+([\d,]+\.\d{2})/i,
+    // Fallback: "Distribución" con número grande después
+    /Distribuci[oó]n[^\n]*?([\d,]+\.\d{2})\s*$/im,
+  ];
+  for (const re of patrones) {
+    const m = texto.match(re);
+    if (m) {
+      const raw = m[m.length - 1];
+      const val = parseFloat(raw.replace(/,/g, ''));
+      if (val > 10) return Math.round(val * 100) / 100;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Extrae el cargo de energía por intervalo horario ($) del recibo CFE.
+ * En la tabla MEM, las filas de energía aparecen como:
+ *   "Energía Base     0.00  250,000.00  0.00  250,000.00"
+ *   "Energía Intermedia 0.00  800,000.00  0.00  800,000.00"
+ *   "Energía Punta    0.00  160,000.00  0.00  160,000.00"
+ * También puede ser "Energ\u00eda" o filas separadas por líneas.
+ */
+function extraerCargoEnergiaIntervalo(texto: string, intervalo: string): number {
+  // Build patterns for the specific interval
+  const patrones = [
+    // "Energía Base  0.00  250,000.00  0.00  250,000.00"
+    new RegExp(`Energ[ií]a\\s+${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+    // "Energía Base  250,000.00"
+    new RegExp(`Energ[ií]a\\s+${intervalo}\\s+[\\d,.]+\\s+([\\d,]+\\.\\d{2})`, 'i'),
+    // Fallback: line with Energía + interval and number at end
+    new RegExp(`Energ[ií]a\\s+${intervalo}[^\\n]*?([\\d,]+\\.\\d{2})\\s*$`, 'im'),
+  ];
+  for (const re of patrones) {
+    const m = texto.match(re);
+    if (m) {
+      const raw = m[m.length - 1];
+      const val = parseFloat(raw.replace(/,/g, ''));
+      if (val > 10) return Math.round(val * 100) / 100;
+    }
+  }
+  return 0;
+}
+
+function extraerCargoEnergiaPunta(texto: string): number {
+  return extraerCargoEnergiaIntervalo(texto, 'Punta');
+}
+
+function extraerCargoEnergiaIntermedia(texto: string): number {
+  return extraerCargoEnergiaIntervalo(texto, 'Intermedia');
+}
+
+function extraerCargoEnergiaBase(texto: string): number {
+  return extraerCargoEnergiaIntervalo(texto, 'Base');
+}
+
+/**
+ * Extrae el importe total a pagar del recibo CFE.
+ * Busca patrones como "Total a pagar $29,199,653.00" o
+ * "TOTAL    29,199,653.00" al final de la tabla de costos.
+ */
+function extraerImporteTotal(texto: string): number {
+  const patrones = [
+    // "Total a Pagar  $29,199,653.00" or "Total a Pagar 29,199,653.00"
+    /Total\s+a\s+[Pp]agar\s*\$?\s*([\d,]+\.\d{2})/i,
+    // "TOTAL  $29,199,653.00"
+    /TOTAL\s+\$\s*([\d,]+\.\d{2})/i,
+    // "Importe total  29,199,653.00"
+    /[Ii]mporte\s+[Tt]otal\s*\$?\s*([\d,]+\.\d{2})/i,
+    // "Total del periodo  29,199,653.00"
+    /Total\s+del\s+per[ií]odo\s*\$?\s*([\d,]+\.\d{2})/i,
+    // "SUBTOTAL" — some receipts use this as the energy total line
+    /SUBTOTAL\s*\$?\s*([\d,]+\.\d{2})/i,
+    // Generic: "Total" at start of line followed by a large number
+    /^Total\s+([\d,]+\.\d{2})\s*$/im,
+  ];
+  for (const re of patrones) {
+    const m = texto.match(re);
+    if (m) {
+      const val = parseFloat(m[1].replace(/,/g, ''));
+      // Sanity: total should be a significant amount
+      if (val > 1000) return Math.round(val * 100) / 100;
+    }
+  }
+  return 0;
+}
+
 function extraerTarifa(texto: string): string {
   const match = texto.match(/TARIFA\s*:\s*(\w+)/i);
   return match ? match[1].toUpperCase() : '';
@@ -682,6 +778,11 @@ export interface ParsedRecibo {
   factorCarga: number;
   factorPotencia: number;
   cargoCapacidadRecibo: number; // $ importe de Capacidad leído del recibo CFE
+  cargoDistribucion: number;    // $ importe de Distribución leído del recibo CFE
+  cargoEnergiaPunta: number;    // $ importe de Energía Punta leído del recibo CFE
+  cargoEnergiaIntermedia: number; // $ importe de Energía Intermedia leído del recibo CFE
+  cargoEnergiaBase: number;     // $ importe de Energía Base leído del recibo CFE
+  importeTotal: number;         // $ Total a Pagar del recibo CFE
   advertencias: string[];
 }
 
@@ -735,6 +836,13 @@ export function parsearRecibo(
   // Cargo de capacidad leído directamente del recibo CFE
   base.cargoCapacidadRecibo = extraerCargoCapacidadRecibo(texto);
 
+  // Cargos adicionales del recibo CFE (tabla de costos MEM)
+  base.cargoDistribucion = extraerCargoDistribucion(texto);
+  base.cargoEnergiaPunta = extraerCargoEnergiaPunta(texto);
+  base.cargoEnergiaIntermedia = extraerCargoEnergiaIntermedia(texto);
+  base.cargoEnergiaBase = extraerCargoEnergiaBase(texto);
+  base.importeTotal = extraerImporteTotal(texto);
+
   // Factor de carga: read from PDF text first; fallback to D_máxima formula
   base.factorCarga =
     extraerFactorCargaPDF(texto) ||
@@ -775,14 +883,21 @@ export function parsearRecibo(
         // We found two sets of data — assign to sub-periodos
         const sub1 = crearSubperiodo(1, dataBlocks[0], dateRanges[0]?.match, base, nombreArchivo);
         const sub2 = crearSubperiodo(2, dataBlocks[1], dateRanges[1]?.match, base, nombreArchivo);
-        // Split cargoCapacidadRecibo proportionally by days
+        // Split all cost fields proportionally by days
         const totalDiasSub = sub1.dias + sub2.dias;
-        if (totalDiasSub > 0 && (base.cargoCapacidadRecibo || 0) > 0) {
-          sub1.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * sub1.dias / totalDiasSub) * 100) / 100;
-          sub2.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * sub2.dias / totalDiasSub) * 100) / 100;
-        } else {
-          sub1.cargoCapacidadRecibo = 0;
-          sub2.cargoCapacidadRecibo = 0;
+        const costFields = [
+          'cargoCapacidadRecibo', 'cargoDistribucion',
+          'cargoEnergiaPunta', 'cargoEnergiaIntermedia',
+          'cargoEnergiaBase', 'importeTotal',
+        ] as const;
+        for (const field of costFields) {
+          if (totalDiasSub > 0 && (base[field] || 0) > 0) {
+            (sub1 as any)[field] = Math.round(((base[field] as number) * sub1.dias / totalDiasSub) * 100) / 100;
+            (sub2 as any)[field] = Math.round(((base[field] as number) * sub2.dias / totalDiasSub) * 100) / 100;
+          } else {
+            (sub1 as any)[field] = 0;
+            (sub2 as any)[field] = 0;
+          }
         }
         return [sub1, sub2];
       } else if (dataBlocks.length === 1) {
@@ -823,15 +938,22 @@ export function parsearRecibo(
             calcularFactorCargaFallback(sub.totalConsumo, sub.dias, sub.demandaMaxima);
         }
 
-        // Split cargoCapacidadRecibo proportionally by days
-        if (totalDias > 0 && (base.cargoCapacidadRecibo || 0) > 0) {
-          const r1 = sub1.dias / totalDias;
-          const r2 = sub2.dias / totalDias;
-          sub1.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * r1) * 100) / 100;
-          sub2.cargoCapacidadRecibo = Math.round((base.cargoCapacidadRecibo! * r2) * 100) / 100;
-        } else {
-          sub1.cargoCapacidadRecibo = 0;
-          sub2.cargoCapacidadRecibo = 0;
+        // Split all cost fields proportionally by days
+        const costFields2 = [
+          'cargoCapacidadRecibo', 'cargoDistribucion',
+          'cargoEnergiaPunta', 'cargoEnergiaIntermedia',
+          'cargoEnergiaBase', 'importeTotal',
+        ] as const;
+        for (const field of costFields2) {
+          if (totalDias > 0 && (base[field] || 0) > 0) {
+            const r1 = sub1.dias / totalDias;
+            const r2 = sub2.dias / totalDias;
+            (sub1 as any)[field] = Math.round(((base[field] as number) * r1) * 100) / 100;
+            (sub2 as any)[field] = Math.round(((base[field] as number) * r2) * 100) / 100;
+          } else {
+            (sub1 as any)[field] = 0;
+            (sub2 as any)[field] = 0;
+          }
         }
 
         return [sub1, sub2];
@@ -846,6 +968,23 @@ export function parsearRecibo(
         sub1.archivoOrigen = nombreArchivo;
         const sub2 = parsearBloqueSubperiodo(bloque2, 2, base);
         sub2.archivoOrigen = nombreArchivo;
+
+        // Split all cost fields proportionally by days
+        const totalDiasFb = sub1.dias + sub2.dias;
+        const costFieldsFb = [
+          'cargoCapacidadRecibo', 'cargoDistribucion',
+          'cargoEnergiaPunta', 'cargoEnergiaIntermedia',
+          'cargoEnergiaBase', 'importeTotal',
+        ] as const;
+        for (const field of costFieldsFb) {
+          if (totalDiasFb > 0 && (base[field] || 0) > 0) {
+            (sub1 as any)[field] = Math.round(((base[field] as number) * sub1.dias / totalDiasFb) * 100) / 100;
+            (sub2 as any)[field] = Math.round(((base[field] as number) * sub2.dias / totalDiasFb) * 100) / 100;
+          } else {
+            (sub1 as any)[field] = (sub1 as any)[field] || 0;
+            (sub2 as any)[field] = (sub2 as any)[field] || 0;
+          }
+        }
         return [sub1, sub2];
       }
     }
@@ -913,6 +1052,11 @@ export function toReciboData(parsed: ParsedRecibo): ReciboData {
     factorCarga: parsed.factorCarga,
     factorPotencia: parsed.factorPotencia,
     cargoCapacidadRecibo: parsed.cargoCapacidadRecibo || 0,
+    cargoDistribucion: parsed.cargoDistribucion || 0,
+    cargoEnergiaPunta: parsed.cargoEnergiaPunta || 0,
+    cargoEnergiaIntermedia: parsed.cargoEnergiaIntermedia || 0,
+    cargoEnergiaBase: parsed.cargoEnergiaBase || 0,
+    importeTotal: parsed.importeTotal || 0,
   };
 }
 

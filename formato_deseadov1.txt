@@ -1,0 +1,464 @@
+ ESTUDIO TÉCNICO–ECONÓMICO 
+Sistema híbrido de Almacenamiento de Energía (BESS)  
+Proyecto: INDUSTRIAS BORIS S.A. DE C.V. 
+Integrador – SISTEMAS SOLARES DEL BAJIO S.A DE C.V 
+Fecha: 27/02/2026 
+Preparado por: Norbert Alvarez – Coordinador Técnico BESS  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Indice 
+ 
+ 
+1.	Resumen Ejecutivo 
+1.	Situación Actual 
+2.	Solución Propuesta 
+3.	Resultados Clave 
+2.	. Situación Energética Actual del Sitio 
+2.1 Información General  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Página de 
+1) Quien es DMStorage 
+2) Porqué instalar BESS 
+7. Beneficios Estratégicos 
+Además de los ahorros directos: 
+•	Mayor estabilidad operativa 
+•	Protección ante incremento tarifario 
+•	Integración futura con sistema solar 
+•	Mejora en indicadores ESG 
+•	Reducción de exposición a riesgo energético 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+1. Resumen Ejecutivo 
+1.1 Situación Actual 
+•	Consumo anual: 9,554 MWh 
+•	Demanda máxima registrada: 1,644 kWp 
+•	Costo eléctrico anual: $29,199,653.00 MXN 
+•	24.7% de la factura corresponde a cargos por capacidad en punta 
+•	6.7% de la factura corresponde a cargos por consumo en punta 
+  
+1.2 Solución Propuesta 
+Implementación de un: 
+🔋 Sistema BESS de GOTION de 5,000 kWh / 3,200 kW 
+Configuración operativa: 
+•	100% desplazamiento de carga (500 kWh / 250 kW) 
+Estrategia principal: 
+•	Desplazamiento de consumo en horario punta 
+  
+1.3 Resultados Clave 
+Indicador 	Valor 
+Inversión estimada 	$9,800,000 MXN* Poner sidenote de que es únicamente inversión de producto 
+Ahorro anual estimado 	$1,210,000 MXN 
+Retorno de Inversión (ROI)  	8.1 años 
+Degradación  	12.6% 
+Recompra recomendada 	 
+Conclusión: 
+El proyecto resulta técnicamente viable y financieramente atractivo bajo condiciones tarifarias actuales. 
+  
+ 
+ 
+2. Situación Energética Actual del Sitio 
+2.1 Información General 
+•	Ubicación: Leon, Guanajuato 
+•	Tarifa: GDMTH 
+•	Capacidad contratada: 1,720 kW 
+  
+2.2 Consumo Anual 
+Concepto 	Valor 
+Consumo anual 	9,554 MWh 
+Consumo mensual promedio 	796 MWh 
+Mes de mayor consumo 	Mayo (867 MWh) 
+Mes de menor consumo 	Abril (160 MWh) 
+  
+2.3 Demanda Máxima 
+•	Demanda máxima: 1,644 kWp 
+•	Promedio mensual de demanda máxima: 1,366 kW 
+  
+2.4 Estructura Actual de Costos 
+Costo anual total: $29,199,653.00 MXN 
+Desglose: 
+•	Cargos por capacidad: $7,207,423.03 MXN (24.7%) 
+•	Demanda punta: $1,959,316.39 MXN (6.7%) 
+•	Energía intermedia: $9,649,337.17 MXN (33.0%) 
+•	Energía base: $3,003,356.17 MXN (10.3) 
+  
+ 
+4. Solución Técnica Propuesta 
+Imagen con Configuración Operativa:  
+100% Desplazamiento de demanda 
+0% Respaldo Energético 
+> Importante, si el cliente quiere considerar un respaldo, tenemos que configurar una parte de la capacidad para respaldo energético, lo cual baja los ahorros generados por desplazamiento de carga. 
+ 
+Agregar información técnica de la marca, fichas técnicas en anexo 
+ 
+4.1 Características del Sistema 
+Imagen del modelo  
+ 
+1 x ESD1331-05P5015 (5MWh 
+1 x EH-3200-HA-MR-35 
+1 x Controlador DEIF 
+ 
+Parámetro 	Valor 
+Capacidad nominal 	5 MWh 
+Potencia nominal 	3.2 MW 
+Tecnología 	Litio LFP 
+Vida útil esperada 	12–15 años 
+Garantía 	5 años (con posibilidad de extender a 10 años) 
+  
+ 
+ 
+ 
+ 
+4.2 Estrategia Operativa 
+Modo Load Shifting 
+Cargar en base y descargar en punta 
+Del primer domingo de abril al sábado anterior al último domingo de octubre 
+ 
+Día de la semana 	Base 	Intermedio 	Punta 
+lunes a viernes 	0:00 - 6:00 	6:00 - 20:00 
+22:00 - 24:00 	20:00 - 22:00 
+sábado 	0:00 - 7:00 	7:00 - 24:00 	  
+domingo y festivo 	0:00 - 19:00 	19:00 - 24:00 	  
+ 
+Del último domingo de octubre al sábado anterior al primer domingo de abril 
+ 
+Día de la semana 	Base 	Intermedio 	Punta 
+lunes a viernes 	0:00 - 6:00 	6:00 - 18:00 
+22:00 - 24:00 	18:00 - 22:00 
+sábado 	0:00 - 8:00 	8:00 - 19:00 
+21:00 - 24:00 	19:00 - 21:00 
+domingo y festivo 	0:00 - 18:00 	18:00 - 24:00 	  
+ 
+ 
+TABLA DE LO QUE SE VA A CARGAR EN BASE Y LO QUE SE VA A CARGAR EN PUNTA 
+ 	Carga original base 	Carga nueva base 	Carga original punta 	Carga nueva punta 
+Enero 	200 	600 	400 	0 
+Febrero 	400 	1000 	800 	200 
+Marzo 	 	 	 	 
+Abril 	 	 	 	 
+Mayo 	 	 	 	 
+Junio 	 	 	 	 
+Julio 	 	 	 	 
+Agosto 	 	 	 	 
+Septiembre 	 	 	 	 
+Octubre 	 	 	 	 
+Noviembre 	 	 	 	 
+Diciembre 	 	 	 	 
+TOTAL 	600 	1600 	1200 	200 
+ 
+5. Simulación de Ahorros 
+5.1 Reducción de Demanda 
+Demanda promedio actual: 1,085 kW 
+Demanda promedio proyectada con BESS: 885–920 kW 
+Reducción promedio considerada: 200 kW. (en punta)
+  
+5.2 Ahorro Total Estimado 
+Concepto 	Ahorro Anual 
+Reducción de demanda 	$559,200 
+Desplazamiento energético 	$285,000 
+Reducción pérdidas operativas 	$365,000 
+Total 	$1,209,200 MXN 
+Redondeado a: $1,210,000 MXN 
+  
+ 	Gasto Original Base 	Gasto nuevo base 	Gasto original punta 	Gasto nuevo punta 
+Enero 	200 	600 	400 	0 
+Febrero 	400 	1000 	800 	200 
+Marzo 	 	 	 	 
+Abril 	 	 	 	 
+Mayo 	 	 	 	 
+Junio 	 	 	 	 
+Julio 	 	 	 	 
+Agosto 	 	 	 	 
+Septiembre 	 	 	 	 
+Octubre 	 	 	 	 
+Noviembre 	 	 	 	 
+Diciembre 	 	 	 	 
+TOTAL 	600 	1600 	1200 	200 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+INSERTAR PARTE DE DEGRADACION Y RECOMPRA 
+ 
+8. Alcance y Supuestos & Consideraciones 
+Está propuesta incluye 
+Incluye: 
+•	Análisis energético histórico 
+•	Simulación anual 
+•	Propuesta técnica preliminar 
+•	Modelo financiero simplificado 
+No incluye: 
+•	Ingeniería de detalle 
+•	Estudios de cortocircuito 
+•	Gestión de permisos 
+•	Obra civil específica 
+•	Análisis específica de degradación y recompra* 
+INSERTAR TABLA DEGRADACION  
+*Text box: La degradación es una parte olvidada…. Estimamos que con el sistema cotizado se puede garantizar la demanda energética completa durante X años. En ese momento, habría que considerar realizar una recompra para regresar a los ahorros originales en año 1.  
+Algo de la degradación natural de la batería 
+*Supuestos: 1 descarga al día 
+ 
+ 
+ 
+Supuestos: 
+•	Tarifas actuales GDMTH 
+•	Crecimiento de carga 3% anual 
+•	300 ciclos anuales 
+•	Degradación promedio 2% anual 
+  
+9. Próximos Pasos 
+1.	Validación técnica en sitio 
+2.	Ingeniería de detalle 
+3.	Cotización final cerrada 
+4.	Cronograma de implementación (4–6 meses) 
+  
+Conclusión Final 
+El sistema BESS de 1 MWh propuesto permite: 
+✔ Reducir la demanda máxima en ~18% 
+✔ Desplazar energía de alto costo 
+✔ Proteger cargas críticas 
+✔ Generar un ahorro anual superior a $1.2M MXN 
+Bajo las condiciones actuales, el proyecto es técnica y financieramente viable. 
+  
+
+#Aqui el plan para efectuarlo:
+lan: Reporte Profesional PDF + Excel desde webapp BESS
+TL;DR — Implementar la generación de un reporte técnico-económico profesional (PDF multi-página) y tablas descargables en Excel (.xlsx) que sigan el formato de formato_deseadov1.txt. Requiere: (1) ampliar el parser de recibos CFE para extraer costos por componente, (2) agregar campos de equipo BESS al formulario de proyecto, (3) implementar modelo de degradación, (4) construir el generador PDF con portada/índice/secciones, (5) exportar tablas Excel. Se eligió jsPDF (ya instalado) + exceljs para Excel.
+
+Steps
+
+Fase 1: Ampliar extracción de datos del recibo CFE
+Extender el parser en parsear-recibo.ts — agregar funciones regex para extraer del texto PDF:
+
+importeTotal — el Total a Pagar del recibo (patrón: TOTAL\s+\$?\s*([\d,]+\.\d{2}) o similar)
+cargoDistribucion — fila "Distribución" en la tabla de costos MEM
+cargoEnergiaPunta — fila de energía punta (buscar en "Energía" + "Punta")
+cargoEnergiaIntermedia — fila de energía intermedia
+cargoEnergiaBase — fila de energía base
+Patrón similar al existente extraerCargoCapacidadRecibo() en parsear-recibo.ts:304: buscar la fila "Distribución", "Energía" por intervalo horario, etc.
+Actualizar la interfaz ParsedRecibo en parsear-recibo.ts:662 con los nuevos campos:
+
+importeTotal: number
+cargoDistribucion: number
+cargoEnergiaPunta: number
+cargoEnergiaIntermedia: number
+cargoEnergiaBase: number
+Actualizar ReciboData en calcular-capacidad.ts:7 con los mismos campos.
+
+Fase 2: Actualizar esquema de base de datos
+Agregar campos al modelo Recibo en schema.prisma para almacenar los costos extraídos:
+
+importeTotal Float @default(0)
+cargoDistribucion Float @default(0)
+cargoEnergiaPunta Float @default(0)
+cargoEnergiaIntermedia Float @default(0)
+cargoEnergiaBase Float @default(0)
+Agregar campos de equipo BESS al modelo Proyecto en schema.prisma:
+
+marcaBess String @default("") (ej: "GOTION")
+modeloBess String @default("") (ej: "ESD1331-05P5015")
+tecnologiaBess String @default("LFP") (LFP, NMC, etc.)
+vidaUtilAnios Int @default(15)
+garantiaAnios Int @default(5)
+capacidadContratada Float @default(0) (kW contratados con CFE)
+integrador String @default("") (empresa integradora)
+preparadoPor String @default("") (nombre del técnico)
+tasaDegradacion Float @default(0.02) (2% anual por defecto)
+ciclosAnuales Int @default(300)
+Ejecutar prisma db push para aplicar migraciones.
+
+Fase 3: Actualizar formulario de proyecto
+Agregar sección "Especificaciones del Equipo" y "Información del Reporte" al formulario en proyecto/nuevo/page.tsx:
+
+Campos: marca, modelo, tecnología (select: LFP/NMC), vida útil, garantía
+Campos: integrador, preparado por, capacidad contratada (kW)
+Campos: tasa de degradación (%), ciclos anuales
+Actualizar POST /api/proyectos en proyectos/route.ts para guardar los nuevos campos.
+
+Actualizar POST /api/analizar en analizar/route.ts para guardar los nuevos campos de costos del recibo al crear registros Recibo.
+
+Fase 4: Modelo de degradación
+Crear función calcularDegradacion() en modelo-financiero.ts:
+
+Input: capacidadKwh, tasaDegradacion (default 2%), ciclosAnuales (default 300), aniosProyeccion
+Output: tabla anual con columnas: año, capacidad efectiva (kWh), % degradación acumulada, ahorro ajustado por degradación, año de recompra sugerido (cuando la capacidad cae debajo de un umbral para cubrir la punta completa)
+Lógica: capacidad año N = capacidadKwh * (1 - tasaDegradacion)^N
+Integrar degradación en generarTablaInversion() en modelo-financiero.ts:244:
+
+El ahorro de cada año se reduce proporcionalmente a la degradación (si la capacidad cae, la energía desplazada es menor)
+Recalcular ROI con degradación incluida
+Agregar interfaz FilaDegradacion a ResultadoFinanciero con: año, capacidadEfectiva, degradacionPct, ahorroAjustado, requiereRecompra (boolean)
+
+Fase 5: Calcular estructura completa de costos
+Crear función calcularEstructuraCostos() en modelo-financiero.ts:
+
+Sumar todos los importeTotal de recibos → Costo anual total
+Sumar cargoCapacidadRecibo → Total cargos capacidad + % del total
+Sumar cargoEnergiaPunta → Total energía punta + %
+Sumar cargoEnergiaIntermedia → Total energía intermedia + %
+Sumar cargoEnergiaBase → Total energía base + %
+Sumar cargoDistribucion → Total distribución + %
+Crear tabla de desplazamiento de carga (load shifting) agregando a ResultadoFinanciero:
+
+Por mes: consumo original base, consumo nuevo base, consumo original punta, consumo nuevo punta (kWh)
+Por mes: gasto original base, gasto nuevo base, gasto original punta, gasto nuevo punta ($)
+Datos ya disponibles parcialmente en FilaSimulacion (consumoBaseOriginal, consumoBaseNuevo, energiaCargaBess)
+Fase 6: Generador de PDF profesional
+Crear archivo webapp/src/lib/generar-reporte-pdf.ts con función generarReportePDF():
+
+Usar jsPDF + jspdf-autotable (ya instalados)
+Secciones del documento:
+Página 1 — Portada:
+
+Logo/título "ESTUDIO TÉCNICO–ECONÓMICO"
+Subtítulo "Sistema híbrido de Almacenamiento de Energía (BESS)"
+Proyecto: nombre del cliente
+Integrador, fecha, preparado por
+Página 2 — Índice:
+
+Tabla de contenidos con números de página
+Página 3 — Resumen Ejecutivo (sección 1):
+
+1.1 Situación Actual: consumo anual, demanda máxima, costo eléctrico anual, % capacidad en punta, % consumo en punta
+1.2 Solución Propuesta: sistema BESS (kWh/kW), marca, configuración operativa
+1.3 Resultados Clave: tabla con Inversión, Ahorro anual, ROI, Degradación
+Página 4-5 — Situación Energética (sección 2):
+
+2.1 Información General: ubicación, tarifa, capacidad contratada
+2.2 Consumo Anual: tabla resumen + mes mayor/menor
+2.3 Demanda Máxima: promedio mensual
+2.4 Estructura Actual de Costos: desglose con %
+Página 6 — Solución Técnica (sección 4):
+
+4.1 Características del Sistema: tabla con parámetros técnicos
+4.2 Estrategia Operativa: tablas de horarios GDMTH por temporada
+Página 7 — Tabla de desplazamiento de carga:
+
+Carga original/nueva base/punta (kWh) mensual
+Gasto original/nuevo base/punta ($) mensual
+Página 8 — Simulación de Ahorros (sección 5):
+
+5.1 Reducción de Demanda
+5.2 Ahorro Total Estimado (tabla por concepto)
+Comparativo mensual (tabla ya existente)
+Página 9 — Tabla de Inversión de Capital:
+
+Tabla año por año con degradación
+Página 10 — Degradación y Recompra:
+
+Tabla de degradación anual
+Año sugerido de recompra
+Texto explicativo
+Página 11 — Alcance, Supuestos, Próximos Pasos:
+
+Listas estáticas con datos del proyecto
+Conclusión final
+Pie de página en todas las páginas: "BESS Analyzer — Fecha — Página X/N"
+
+Reemplazar handleDescargarPDF() en page.tsx línea 196](webapp/src/app/proyecto/%5Bid%5D/page.tsx#L196) para llamar a generarReportePDF() pasando proyecto, resultados y los nuevos datos.
+
+Fase 7: Generador de Excel
+Instalar exceljs (npm install exceljs) — librería robusta para generar .xlsx con formato, bordes y estilos. Es compatible con browser.
+
+Crear archivo webapp/src/lib/generar-reporte-excel.ts con función generarReporteExcel():
+
+Hoja 1: "Consumos" — tabla de recibos con consumos y demandas por mes
+Hoja 2: "Estructura Costos" — desglose de costos por componente
+Hoja 3: "Comparativo BESS" — tabla comparativo mensual (Cap s/BESS, Cap c/BESS, Ahorro, etc.)
+Hoja 4: "Desplazamiento Carga" — carga original/nueva base/punta (kWh y $)
+Hoja 5: "Inversión Capital" — tabla año por año con degradación
+Hoja 6: "Degradación" — tabla de degradación anual y recompra
+Cada hoja con headers con estilo (fondo azul #132857, texto blanco), bordes, formato numérico MXN, columnas auto-dimensionadas
+Agregar botón "Descargar Excel" en proyecto/[id]/page.tsx junto al botón PDF existente.
+
+Fase 8: Actualizar la UI del proyecto
+Agregar sección visual de Estructura de Costos en la página del proyecto proyecto/[id]/page.tsx:
+
+Mostrar desglose de costos como tarjetas o tabla adicional
+Mostrar tabla de degradación
+Agregar sección de Desplazamiento de Carga en la misma página:
+
+Tabla mensual de carga original/nueva (kWh)
+Verification
+
+Parser: Subir recibos CFE de prueba y verificar en el debug log que se extraen importeTotal, cargoDistribucion, cargoEnergiaPunta, etc. correctamente
+Formulario: Crear un proyecto nuevo con todos los campos de equipo y verificar que se guardan en DB
+Degradación: Verificar que la tabla de inversión muestra ahorros decrecientes y que el ROI se ajusta
+PDF: Descargar el PDF y verificar que tiene portada, índice, todas las secciones y tablas con formato correcto
+Excel: Descargar el .xlsx, abrirlo en Excel y verificar que las tablas tienen formato correcto, bordes, y son copy-paste ready
+Consistencia: Verificar que los números del PDF coinciden con los del Excel y con los de la webapp
+Decisions
+
+jsPDF se mantiene sobre alternativas como @react-pdf/renderer — ya está instalado, evita dependencias pesadas server-side, y con jspdf-autotable puede producir tablas profesionales
+exceljs sobre xlsx/sheetjs — mejor soporte de estilos/formato (bordes, colores, ancho de columnas), que es crítico para el requisito de copy-paste a Excel
+Campos de equipo en formulario (no catálogo predefinido) — flexibilidad para cualquier marca/modelo
+Degradación lineal 
+(
+1
+−
+t
+a
+s
+a
+)
+N
+(1−tasa) 
+N
+  — modelo simplificado configurable; el documento menciona 2% anual como default

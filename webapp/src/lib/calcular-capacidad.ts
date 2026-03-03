@@ -21,6 +21,11 @@ export interface ReciboData {
   factorCarga: number;
   factorPotencia: number;
   cargoCapacidadRecibo: number; // $ importe de Capacidad leído del recibo CFE
+  cargoDistribucion: number;    // $ importe de Distribución leído del recibo CFE
+  cargoEnergiaPunta: number;    // $ importe de Energía Punta leído del recibo CFE
+  cargoEnergiaIntermedia: number; // $ importe de Energía Intermedia leído del recibo CFE
+  cargoEnergiaBase: number;     // $ importe de Energía Base leído del recibo CFE
+  importeTotal: number;         // $ Total a Pagar del recibo CFE
 }
 
 export interface TarifaGDMTH {
