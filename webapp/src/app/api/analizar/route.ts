@@ -11,6 +11,7 @@ import {
 } from '@/lib/parsear-recibo';
 import { ejecutarModeloFinanciero, type ParametrosBESS } from '@/lib/modelo-financiero';
 import { cargarTodasTarifas, filtrarTarifas } from '@/lib/cargar-tarifas';
+import { rateLimit, RATE_LIMIT_ANALIZAR } from '@/lib/rate-limit';
 
 // ─── Debug logger ────────────────────────────────────────────────────────────
 class AnalisisLog {
@@ -53,6 +54,21 @@ export async function POST(req: NextRequest) {
 
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+
+  // Rate limiting por usuario
+  const rl = rateLimit(`analizar:${userId}`, RATE_LIMIT_ANALIZAR);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: 'Demasiadas solicitudes de análisis. Intente de nuevo más tarde.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil(rl.resetIn / 1000)),
+          'X-RateLimit-Remaining': '0',
+        },
+      },
+    );
+  }
 
   try {
     const formData = await req.formData();

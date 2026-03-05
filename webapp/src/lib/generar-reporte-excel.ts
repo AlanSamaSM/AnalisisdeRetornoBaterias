@@ -345,13 +345,46 @@ export async function generarReporteExcel(
   wb.creator = 'BESS Analyzer';
   wb.created = new Date();
 
-  // Crear las 6 hojas
+  // Crear las 6 hojas + hoja de disclaimer legal
   sheetConsumos(wb, proyecto);
   sheetEstructuraCostos(wb, resultados);
   sheetComparativo(wb, resultados);
   sheetDesplazamiento(wb, resultados);
   sheetInversion(wb, resultados);
   sheetDegradacion(wb, resultados);
+
+  // Hoja de Aviso Legal
+  const ws = wb.addWorksheet('Aviso Legal');
+  ws.getColumn(1).width = 80;
+  const titleRow = ws.addRow(['AVISO LEGAL — DM Solar BESS']);
+  titleRow.font = { bold: true, size: 14 };
+  ws.addRow([]);
+  const disclaimerTexts = [
+    'Las proyecciones financieras, estimaciones de ahorro y cálculos de retorno de inversión contenidos en este documento son estimaciones basadas en modelos matemáticos que utilizan datos históricos de consumo y tarifas vigentes al momento del análisis.',
+    '',
+    'Este reporte NO constituye asesoría financiera, fiscal, legal ni de inversión certificada.',
+    'NO garantiza un retorno de inversión específico ni ahorros determinados.',
+    '',
+    'Los resultados están sujetos a:',
+    '• Cambios en las tarifas publicadas por la CFE y la CRE.',
+    '• Variaciones del tipo de cambio.',
+    '• Modificaciones regulatorias del sector eléctrico.',
+    '• Condiciones operativas reales del inmueble.',
+    '',
+    'La instalación de sistemas BESS requiere:',
+    '• Validación técnica en sitio por un profesional certificado.',
+    '• Ingeniería de detalle y estudios de cortocircuito.',
+    '• Obtención de permisos ante las autoridades competentes (SENER, CRE, CFE Distribución).',
+    '• Cumplimiento de la Ley del Sector Eléctrico (2025) y sus reglamentos.',
+    '',
+    `Documento generado automáticamente el ${new Date().toLocaleDateString('es-MX')} por la plataforma DM Solar BESS.`,
+    'Para más información consulte nuestros Términos de Servicio y Aviso de Privacidad.',
+  ];
+  disclaimerTexts.forEach((line) => {
+    const row = ws.addRow([line]);
+    row.font = { size: 10 };
+    row.alignment = { wrapText: true };
+  });
 
   // Generar buffer y descargar
   const buffer = await wb.xlsx.writeBuffer();

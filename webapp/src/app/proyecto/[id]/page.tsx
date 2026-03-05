@@ -72,6 +72,7 @@ export default function ProyectoPage() {
   const [loading, setLoading] = useState(true);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [showLog, setShowLog] = useState(false);
+  const [consentimientoCarga, setConsentimientoCarga] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
@@ -220,10 +221,38 @@ export default function ProyectoPage() {
           <UploadZone onFilesSelected={setPdfFiles} />
 
           {pdfFiles.length > 0 && (
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 space-y-3">
+              {/* Consentimiento de carga */}
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <input
+                  type="checkbox"
+                  id="consentimientoCarga"
+                  checked={consentimientoCarga}
+                  onChange={(e) => setConsentimientoCarga(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                />
+                <label htmlFor="consentimientoCarga" className="text-xs text-amber-800 leading-relaxed">
+                  Declaro bajo protesta de decir verdad que soy el{' '}
+                  <strong>titular legítimo</strong> del recibo de CFE que estoy
+                  cargando, o cuento con las facultades de representación legal
+                  para disponer de esta información. Autorizo la extracción y
+                  análisis de los datos contenidos en el PDF exclusivamente
+                  para el modelado financiero BESS, conforme al{' '}
+                  <a
+                    href="/aviso-de-privacidad"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-brand-700 underline font-medium"
+                  >
+                    Aviso de Privacidad
+                  </a>.
+                </label>
+              </div>
+
+              <div className="flex items-center gap-3">
               <button
                 onClick={handleAnalizar}
-                disabled={uploading}
+                disabled={uploading || !consentimientoCarga}
                 className="bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-2.5 rounded-lg transition disabled:opacity-60 flex items-center gap-2 text-sm btn-press"
               >
                 {uploading ? (
@@ -236,6 +265,7 @@ export default function ProyectoPage() {
               {uploadMsg && (
                 <p className="text-sm text-slate-500">{uploadMsg}</p>
               )}
+              </div>
             </div>
           )}
         </div>
@@ -310,6 +340,22 @@ export default function ProyectoPage() {
         {/* Results */}
         {resultados && (
           <>
+            {/* Disclaimer Legal */}
+            <div className="bg-slate-100 border border-slate-200 rounded-xl p-4 mb-6 animate-fade-in-up">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                <strong className="text-slate-600">Aviso:</strong> Las
+                proyecciones financieras y estimaciones de ahorro presentadas
+                son cálculos basados en modelos matemáticos con datos
+                históricos y tarifas vigentes. No constituyen asesoría
+                financiera certificada ni garantizan retornos específicos. Los
+                resultados están sujetos a cambios tarifarios de CFE/CRE,
+                variaciones cambiarias y condiciones operativas reales. La
+                instalación de sistemas BESS requiere validación técnica en
+                sitio y permisos conforme a la Ley del Sector Eléctrico
+                (2025).
+              </p>
+            </div>
+
             {/* KPI Cards */}
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8 stagger-children">
               <KPICard

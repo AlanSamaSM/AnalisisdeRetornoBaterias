@@ -1,15 +1,37 @@
 // ─── API: Registrar nuevo usuario ───────────────────────────────────────────
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { prisma } from '@/lib/db';
-
+import { prisma } from '@/lib/db';import { rateLimit, RATE_LIMIT_REGISTRO, getClientIP } from '@/lib/rate-limit';
 export async function POST(req: NextRequest) {
   try {
-    const { email, name, password, empresa } = await req.json();
+    // Rate limiting por IP
+    const ip = getClientIP(req.headers);
+    const rl = rateLimit(`registro:${ip}`, RATE_LIMIT_REGISTRO);
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: 'Demasiados intentos de registro. Intente de nuevo más tarde.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil(rl.resetIn / 1000)),
+            'X-RateLimit-Remaining': '0',
+          },
+        },
+      );
+    }
+
+    const { email, name, password, empresa, aceptaTerminos } = await req.json();
 
     if (!email || !name || !password) {
       return NextResponse.json(
         { error: 'Email, nombre y contraseña son requeridos' },
+        { status: 400 },
+      );
+    }
+
+    if (!aceptaTerminos) {
+      return NextResponse.json(
+        { error: 'Debe aceptar el Aviso de Privacidad y los Términos de Servicio' },
         { status: 400 },
       );
     }

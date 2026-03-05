@@ -7,7 +7,8 @@ import Link from 'next/link';
 import Header from '@/components/Header';
 import Modal from '@/components/Modal';
 import { SkeletonCard } from '@/components/Skeleton';
-import { Plus, FolderOpen, Calendar, MapPin, Battery, Trash2, Loader2 } from 'lucide-react';
+import { Plus, FolderOpen, Calendar, MapPin, Battery, Trash2, Loader2, UserX } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 import { toast } from 'sonner';
 
 interface Proyecto {
@@ -46,6 +47,8 @@ export default function DashboardPage() {
   }, [status]);
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const confirmDelete = async () => {
     if (!deleteId) return;
@@ -57,6 +60,24 @@ export default function DashboardPage() {
       toast.error('Error al eliminar el proyecto');
     }
     setDeleteId(null);
+  };
+
+  const confirmDeleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const res = await fetch('/api/cuenta', { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Cuenta eliminada exitosamente');
+        signOut({ callbackUrl: '/login' });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Error al eliminar la cuenta');
+      }
+    } catch {
+      toast.error('Error al eliminar la cuenta');
+    }
+    setDeletingAccount(false);
+    setShowDeleteAccount(false);
   };
 
   if (status === 'loading' || loading) {
@@ -221,6 +242,71 @@ export default function DashboardPage() {
         <p className="text-sm text-slate-600">
           Esta acción no se puede deshacer. Se eliminarán todos los recibos y resultados asociados al proyecto.
         </p>
+      </Modal>
+
+      {/* Delete Account section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        <div className="border-t border-slate-200 pt-8 mt-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-600">Gestión de Cuenta</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Derecho de Cancelación (ARCO) — Eliminar su cuenta y todos los datos asociados
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDeleteAccount(true)}
+              className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition flex items-center gap-1.5"
+            >
+              <UserX className="w-3.5 h-3.5" />
+              Eliminar mi cuenta
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Delete Account confirmation modal */}
+      <Modal
+        open={showDeleteAccount}
+        onClose={() => setShowDeleteAccount(false)}
+        title="Eliminar cuenta y datos"
+        footer={
+          <>
+            <button
+              onClick={() => setShowDeleteAccount(false)}
+              className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={confirmDeleteAccount}
+              disabled={deletingAccount}
+              className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition disabled:opacity-60 flex items-center gap-2"
+            >
+              {deletingAccount && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Eliminar permanentemente
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-slate-600">
+            Esta acción es <strong>irreversible</strong> y eliminará permanentemente:
+          </p>
+          <ul className="text-sm text-slate-600 list-disc pl-5 space-y-1">
+            <li>Su cuenta de usuario e información personal</li>
+            <li>Todos sus proyectos y configuraciones BESS</li>
+            <li>Todos los recibos procesados y datos de consumo</li>
+            <li>Todos los resultados financieros y reportes</li>
+          </ul>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+            <p className="text-xs text-amber-800">
+              Conforme a la LFPDPPP (2025) y su derecho de Cancelación (ARCO),
+              todos los datos personales y patrimoniales asociados a su cuenta
+              serán suprimidos de nuestra base de datos de forma irreversible.
+            </p>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -969,6 +969,37 @@ function renderAlcanceSupuestos(
   y += 5;
   doc.setFont('helvetica', 'bold');
   doc.text('Bajo las condiciones actuales, el proyecto es técnica y financieramente viable.', MARGIN, y);
+
+  // ─── Disclaimer Legal ────────────────────────────────────────────────────
+  y += 12;
+  if (y > PAGE_H - 70) {
+    doc.addPage();
+    pageHeader(doc);
+    y = 38;
+  }
+
+  doc.setFillColor(245, 245, 245);
+  doc.roundedRect(MARGIN, y - 3, CONTENT_W, 52, 2, 2, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.roundedRect(MARGIN, y - 3, CONTENT_W, 52, 2, 2, 'S');
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(100, 100, 100);
+  doc.text('AVISO LEGAL', MARGIN + 4, y + 4);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  const disclaimerLines = doc.splitTextToSize(
+    'Las proyecciones financieras, estimaciones de ahorro y cálculos de retorno de inversión contenidos en este documento ' +
+    'son estimaciones basadas en modelos matemáticos que utilizan datos históricos de consumo y tarifas vigentes al momento ' +
+    'del análisis. NO constituyen asesoría financiera, fiscal, legal ni de inversión certificada. NO garantizan un retorno ' +
+    'de inversión específico ni ahorros determinados. Los resultados están sujetos a cambios en las tarifas de CFE/CRE, ' +
+    'variaciones del tipo de cambio, modificaciones regulatorias y condiciones operativas reales. La instalación de sistemas ' +
+    'BESS requiere validación técnica en sitio, ingeniería de detalle y permisos ante las autoridades competentes conforme a ' +
+    'la Ley del Sector Eléctrico (2025). Documento generado automáticamente por la plataforma DM Solar BESS.',
+    CONTENT_W - 8,
+  );
+  doc.text(disclaimerLines, MARGIN + 4, y + 10);
 }
 
 // ─── Función principal ──────────────────────────────────────────────────────

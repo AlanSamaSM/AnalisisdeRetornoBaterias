@@ -8,6 +8,7 @@ import Link from 'next/link';
 export default function RegistroPage() {
   const router = useRouter();
   const [form, setForm] = useState({ name: '', email: '', password: '', empresa: '' });
+  const [aceptaTerminos, setAceptaTerminos] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -16,10 +17,16 @@ export default function RegistroPage() {
     setError('');
     setLoading(true);
 
+    if (!aceptaTerminos) {
+      setError('Debes aceptar el Aviso de Privacidad y los Términos de Servicio');
+      setLoading(false);
+      return;
+    }
+
     const res = await fetch('/api/registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, aceptaTerminos }),
     });
 
     const data = await res.json();
@@ -102,6 +109,39 @@ export default function RegistroPage() {
             />
           </div>
 
+          {/* Consentimiento */}
+          <div className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              id="aceptaTerminos"
+              checked={aceptaTerminos}
+              onChange={(e) => setAceptaTerminos(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            />
+            <label htmlFor="aceptaTerminos" className="text-xs text-slate-500 leading-relaxed">
+              He leído y acepto el{' '}
+              <a
+                href="/aviso-de-privacidad"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-600 hover:text-brand-700 underline"
+              >
+                Aviso de Privacidad
+              </a>{' '}
+              y los{' '}
+              <a
+                href="/terminos"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-600 hover:text-brand-700 underline"
+              >
+                Términos y Condiciones de Servicio
+              </a>
+              . Autorizo el tratamiento de mis datos personales conforme a
+              las finalidades descritas.
+            </label>
+          </div>
+
           {error && (
             <div className="bg-red-50 text-red-600 text-sm px-4 py-2.5 rounded-lg">
               {error}
@@ -110,7 +150,7 @@ export default function RegistroPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !aceptaTerminos}
             className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-60 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
