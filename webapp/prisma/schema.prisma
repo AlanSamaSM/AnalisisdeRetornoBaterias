@@ -29,6 +29,7 @@ model Proyecto {
   estado    String   @default("")
   municipio String   @default("")
   region    String   @default("NORTE")
+  division  String   @default("Norte")
   tarifa    String   @default("GDMTH")
   notas     String?
   createdAt DateTime @default(now())

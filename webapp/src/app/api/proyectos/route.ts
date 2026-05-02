@@ -3,6 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import {
+  DIVISIONES_CFE,
+  DIVISION_DEFAULT,
+  regionIrradiacionDeDivision,
+} from '@/lib/divisiones';
 
 async function getUserId() {
   const session = await getServerSession(authOptions);
@@ -33,7 +38,7 @@ export async function POST(req: NextRequest) {
     nombre,
     estado,
     municipio,
-    region,
+    division,
     potenciaKw,
     capacidadKwh,
     precioUsd,
@@ -62,7 +67,11 @@ export async function POST(req: NextRequest) {
   const safeName = String(nombre).substring(0, 200);
   const safeEstado = String(estado || '').substring(0, 100);
   const safeMunicipio = String(municipio || '').substring(0, 100);
-  const safeRegion = ['NORTE', 'CENTRAL', 'BAJA CALIFORNIA SUR'].includes(region) ? region : 'NORTE';
+  const safeDivision = (DIVISIONES_CFE as readonly string[]).includes(division)
+    ? (division as string)
+    : DIVISION_DEFAULT;
+  // Región de irradiación (NORTE/CENTRAL/BAJA CALIFORNIA SUR) derivada de la división
+  const safeRegion = regionIrradiacionDeDivision(safeDivision);
   const safeTecnologia = ['LFP', 'NMC', 'LTO', 'NaS'].includes(tecnologiaBess) ? tecnologiaBess : 'LFP';
 
   const numVal = (v: any, min: number, max: number, fallback: number) => {
@@ -76,6 +85,7 @@ export async function POST(req: NextRequest) {
       estado: safeEstado,
       municipio: safeMunicipio,
       region: safeRegion,
+      division: safeDivision,
       potenciaKw: numVal(potenciaKw, 0, 100000, 0),
       capacidadKwh: numVal(capacidadKwh, 0, 1000000, 0),
       precioUsd: numVal(precioUsd, 0, 10000000, 0),

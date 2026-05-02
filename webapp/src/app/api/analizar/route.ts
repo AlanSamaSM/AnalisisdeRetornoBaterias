@@ -87,12 +87,11 @@ export async function POST(req: NextRequest) {
     }
 
     log.log(`Proyecto: "${proyecto.nombre}" | Potencia: ${proyecto.potenciaKw} kW | Capacidad: ${proyecto.capacidadKwh} kWh`);
-    log.log(`Región: ${proyecto.region} | TC: ${proyecto.tipoCambio} | Precio USD: ${proyecto.precioUsd}`);
-    log.log(`Estado DB: "${proyecto.estado}" | Municipio DB: "${proyecto.municipio}"`);
+    log.log(`División CFE: ${proyecto.division ?? 'Norte'} | Región irradiación: ${proyecto.region} | TC: ${proyecto.tipoCambio} | Precio USD: ${proyecto.precioUsd}`);
 
     // Load tarifas from bundled CSV (server-side)
     const allTarifas = cargarTodasTarifas();
-    log.log(`Tarifas CSV cargadas: ${allTarifas.length} filas totales`);
+    log.log(`Tarifas CSV cargadas: ${allTarifas.length} filas totales (anio×mes×división)`);
 
     // Process uploaded PDFs
     const files = formData.getAll('pdfs') as File[];
@@ -244,7 +243,8 @@ export async function POST(req: NextRequest) {
     }
     log.log(`${allParsed.length} recibos guardados en DB`);
 
-    // Update project estado/municipio from first parsed receipt
+    // Guardar estado/municipio parseados como metadata informativa (no afectan tarifas).
+    // La división tarifaria es elegida por el usuario al crear el proyecto.
     if (allParsed.length > 0) {
       const first = allParsed[0];
       if (first.estado || first.municipio) {
@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
             municipio: first.municipio || proyecto.municipio,
           },
         });
-        log.log(`Proyecto actualizado: estado="${first.estado || proyecto.estado}", municipio="${first.municipio || proyecto.municipio}"`);
+        log.log(`Proyecto actualizado (metadata): estado="${first.estado || proyecto.estado}", municipio="${first.municipio || proyecto.municipio}"`);
       }
     }
 
@@ -284,54 +284,34 @@ export async function POST(req: NextRequest) {
       log.log(`Params BESS: ${params.potenciaKw} kW, ${params.capacidadKwh} kWh, región=${params.region}, eficiencia=${params.eficiencia}`);
 
       const recibosData = allParsed.map(toReciboData);
-      const estado = allParsed[0].estado || proyecto.estado;
-      const municipio = allParsed[0].municipio || proyecto.municipio;
+      const division = proyecto.division ?? 'Norte';
 
-      log.log(`Ubicación para tarifas: estado="${estado}", municipio="${municipio}"`);
+      log.log(`División tarifaria CFE: "${division}"`);
 
-      // Filter tarifas for this project's location
-      const tarifas = filtrarTarifas(allTarifas, estado, municipio);
-      log.log(`Tarifas filtradas: ${tarifas.length} filas`);
+      // Filter tarifas for this project's CFE division
+      const tarifas = filtrarTarifas(allTarifas, division);
+      log.log(`Tarifas filtradas para división "${division}": ${tarifas.length} filas`);
 
       if (tarifas.length > 0) {
         // Log sample tarifa
         const sample = tarifas[0];
-        log.log(`  Ejemplo tarifa: ${sample.estado}/${sample.municipio} | ${sample.mes} | ${sample.intHorario} | cap=${sample.capacidad} $/kW | monto=${sample.monto} $/kWh`);
+        log.log(`  Ejemplo tarifa: ${sample.division} | ${sample.anio} ${sample.mes} | base=${sample.tarifaBase} $/kWh | inter=${sample.tarifaIntermedia} | punta=${sample.tarifaPunta} | cap=${sample.cargoCapacidad} $/kW | dist=${sample.tarifaDistribucion} $/kW`);
 
-        // Log all unique months in tarifas
-        const mesesTarifa = Array.from(new Set(tarifas.map((t) => t.mes)));
-        log.log(`  Meses en tarifas: ${mesesTarifa.join(', ')}`);
+        const aniosDisponibles = Array.from(new Set(tarifas.map((t) => t.anio))).sort();
+        log.log(`  Años disponibles en tarifas: ${aniosDisponibles.join(', ')}`);
 
-        // Log horarios for debugging tarifa matching
-        const horarios = Array.from(new Set(tarifas.map((t) => t.intHorario.trim())));
-        log.log(`  Int. Horarios en tarifas: ${horarios.join(', ')}`);
-        log.log(`  Tarifas por horario: ${horarios.map(h => `${h}=${tarifas.filter(t => t.intHorario.trim() === h).length}`).join(', ')}`);
+        const aniosRecibos = Array.from(new Set(recibosData.map((r) => r.anio))).sort();
+        log.log(`  Años en recibos: ${aniosRecibos.join(', ')}`);
 
-        // Check if PUNTA rows exist
-        const puntaRows = tarifas.filter(t => t.intHorario.trim().toUpperCase() === 'PUNTA');
-        const baseRows = tarifas.filter(t => t.intHorario.trim().toUpperCase() === 'BASE');
-        log.log(`  Filas PUNTA: ${puntaRows.length} | Filas BASE: ${baseRows.length}`);
+        const mesesRecibos = recibosData.map((r) => `${r.mes} ${r.anio} (mesNum=${r.mesNum})`);
+        log.log(`  Recibos: ${mesesRecibos.join(', ')}`);
 
-        if (puntaRows.length === 0) {
-          log.warn(`  ¡NO hay tarifas PUNTA! Solo hay: ${horarios.join(', ')}`);
-        }
-
-        // Log all unique months in recibos
-        const mesesRecibos = recibosData.map((r) => `${r.mes} (mesNum=${r.mesNum})`);
-        log.log(`  Meses en recibos: ${mesesRecibos.join(', ')}`);
-
-        // Log tarifa-estado mismatch warning
-        if (sample.estado.toUpperCase() !== estado.toUpperCase()) {
-          log.warn(`  Tarifas son de ${sample.estado}/${sample.municipio} (fallback) — proyecto es ${estado}/${municipio}`);
-          log.log(`  Lookup usa fallback: búsqueda por mes+intHorario (sin filtro de ubicación)`);
-        }
         try {
           resultadoFinanciero = ejecutarModeloFinanciero(
             params,
             recibosData,
             tarifas,
-            estado,
-            municipio,
+            division,
           );
 
           log.log(`Modelo ejecutado exitosamente`);
@@ -363,8 +343,8 @@ export async function POST(req: NextRequest) {
           errores.push(`Modelo financiero: ${modelErr.message}`);
         }
       } else {
-        log.warn(`No se encontraron tarifas para ${estado}/${municipio} — modelo NO ejecutado`);
-        log.warn(`Estados disponibles en CSV: ${Array.from(new Set(allTarifas.map((t) => t.estado))).join(', ')}`);
+        log.warn(`No se encontraron tarifas para división "${division}" — modelo NO ejecutado`);
+        log.warn(`Divisiones disponibles en CSV: ${Array.from(new Set(allTarifas.map((t) => t.division))).join(', ')}`);
       }
     } else {
       log.warn(`Modelo NO ejecutado — potencia=${proyecto.potenciaKw}, capacidad=${proyecto.capacidadKwh}, recibos=${allParsed.length}`);

@@ -4,6 +4,8 @@
 // D_facturable = min(D_punta, floor(Q / (24 * d * FC)))
 // =============================================================================
 
+import { normalizarDivision } from './divisiones';
+
 export interface ReciboData {
   mes: string;
   mesNum: number;
@@ -28,27 +30,33 @@ export interface ReciboData {
   importeTotal: number;         // $ Total a Pagar del recibo CFE
 }
 
+/**
+ * Una fila de tarifa CFE GDMTH: agrupa todos los cargos para un (anio, mes, division).
+ * Las 5 filas del CSV oficial (1 único + 3 variable + 1 fijo) se pivotan a esta forma.
+ */
 export interface TarifaGDMTH {
-  estado: string;
-  municipio: string;
-  mes: string;
-  intHorario: string; // 'BASE' | 'INTERMEDIA' | 'PUNTA'
-  capacidad: number;  // $/kW (cargo por capacidad)
-  distribucion: number; // $/kW (cargo por distribución)
-  monto: number;      // $/kWh
+  anio: number;
+  mes: string;          // Forma canónica: "Enero", "Febrero", ...
+  division: string;     // Forma canónica de DIVISIONES_CFE
+  tarifaBase: number;       // $/kWh — energía periodo Base
+  tarifaIntermedia: number; // $/kWh — energía periodo Intermedia
+  tarifaPunta: number;      // $/kWh — energía periodo Punta
+  tarifaDistribucion: number; // $/kW — cargo distribución
+  cargoCapacidad: number;     // $/kW — cargo capacidad
 }
 
 export interface CargoCapacidad {
   periodo: string;
   mesTarifa: string;
   mesNum: number;
+  anio: number;
   dias: number;
   temporada: string;
   dPunta: number;
   dMaxima: number;       // demanda máxima mensual
   totalConsumo: number;
   factorCarga: number;
-  dFactPre: number;      // piso de facturación por fórmula: floor(Q/(24*d*FC))
+  dFactPre: number;      // piso de facturación: floor(Q/(24*d*FC))
   dFacturable: number;   // min(D_punta, dFactPre) para Capacidad
   dFactDist: number;     // min(D_maxima, dFactPre) para Distribución
   tarifaCap: number;     // $/kW capacidad
@@ -58,117 +66,82 @@ export interface CargoCapacidad {
   cargoCapacidadRecibo: number; // $ leído del recibo CFE
 }
 
-/** Limpia un string numérico con comas y espacios */
-function limpiarNumero(val: string | number): number {
-  if (typeof val === 'number') return val;
-  const limpio = val.replace(/[\s,%]/g, '').replace(/,/g, '');
-  const n = parseFloat(limpio);
-  return isNaN(n) ? 0 : n;
-}
+const MES_CANON_LOOKUP: Record<string, string> = {
+  ENERO: 'Enero', FEBRERO: 'Febrero', MARZO: 'Marzo', ABRIL: 'Abril',
+  MAYO: 'Mayo', JUNIO: 'Junio', JULIO: 'Julio', AGOSTO: 'Agosto',
+  SEPTIEMBRE: 'Septiembre', OCTUBRE: 'Octubre', NOVIEMBRE: 'Noviembre', DICIEMBRE: 'Diciembre',
+};
 
 /**
- * Obtiene la tarifa de capacidad ($/kW) para un mes dado.
- * Las tarifas ya vienen pre-filtradas por ubicación desde filtrarTarifas(),
- * así que solo filtramos por mes + intHorario.
- * Si no hay match exacto por ubicación, busca solo por mes+PUNTA.
+ * Busca la fila de tarifa para una (division, mes) dada en un año específico.
+ * Política de año: intenta match exacto; si no existe, usa el año más reciente
+ * disponible (con warning).
  */
+function buscarFilaTarifa(
+  tarifas: TarifaGDMTH[],
+  division: string,
+  anio: number,
+  mes: string,
+): TarifaGDMTH | null {
+  const divNorm = normalizarDivision(division);
+  if (!divNorm) return null;
+
+  const mesUp = mes.trim().toUpperCase();
+  const mesCanon = MES_CANON_LOOKUP[mesUp] || mes;
+
+  // 1) Match exacto por año
+  let fila = tarifas.find(
+    (t) => t.division === divNorm && t.anio === anio && t.mes === mesCanon,
+  );
+  if (fila) return fila;
+
+  // 2) Fallback: año más reciente disponible para esa división+mes
+  const candidatos = tarifas
+    .filter((t) => t.division === divNorm && t.mes === mesCanon)
+    .sort((a, b) => b.anio - a.anio);
+
+  if (candidatos.length > 0) {
+    const f = candidatos[0];
+    console.warn(
+      `Tarifa: No hay datos para ${divNorm}/${mesCanon}/${anio} — usando año más reciente disponible: ${f.anio}`,
+    );
+    return f;
+  }
+
+  return null;
+}
+
+/** Cargo capacidad ($/kW) para una (division, anio, mes). */
 export function obtenerTarifaCapacidad(
   tarifas: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
+  anio: number,
   mes: string,
 ): number {
-  const mesUp = mes.trim().toUpperCase();
-  const estadoUp = estado.trim().toUpperCase();
-  const munUp = municipio.trim().toUpperCase();
-
-  // Try exact match first
-  let fila = tarifas.find(
-    (t) =>
-      t.estado.trim().toUpperCase() === estadoUp &&
-      t.municipio.trim().toUpperCase() === munUp &&
-      t.mes.trim().toUpperCase() === mesUp &&
-      t.intHorario.trim().toUpperCase() === 'PUNTA',
-  );
-
-  // Fallback: match by mes + intHorario only (tarifas already pre-filtered by location)
-  if (!fila) {
-    fila = tarifas.find(
-      (t) =>
-        t.mes.trim().toUpperCase() === mesUp &&
-        t.intHorario.trim().toUpperCase() === 'PUNTA',
-    );
-  }
-
-  return fila ? fila.capacidad : 0;
+  const f = buscarFilaTarifa(tarifas, division, anio, mes);
+  return f ? f.cargoCapacidad : 0;
 }
 
-/**
- * Obtiene la tarifa de distribución ($/kW) para un mes dado.
- * Usa el horario PUNTA (donde está el dato de distribución en la fila).
- */
+/** Tarifa distribución ($/kW) para una (division, anio, mes). */
 export function obtenerTarifaDistribucion(
   tarifas: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
+  anio: number,
   mes: string,
 ): number {
-  const mesUp = mes.trim().toUpperCase();
-  const estadoUp = estado.trim().toUpperCase();
-  const munUp = municipio.trim().toUpperCase();
-
-  let fila = tarifas.find(
-    (t) =>
-      t.estado.trim().toUpperCase() === estadoUp &&
-      t.municipio.trim().toUpperCase() === munUp &&
-      t.mes.trim().toUpperCase() === mesUp &&
-      t.intHorario.trim().toUpperCase() === 'PUNTA',
-  );
-
-  if (!fila) {
-    fila = tarifas.find(
-      (t) =>
-        t.mes.trim().toUpperCase() === mesUp &&
-        t.intHorario.trim().toUpperCase() === 'PUNTA',
-    );
-  }
-
-  return fila ? fila.distribucion : 0;
+  const f = buscarFilaTarifa(tarifas, division, anio, mes);
+  return f ? f.tarifaDistribucion : 0;
 }
 
-/**
- * Obtiene la tarifa BASE ($/kWh) para un mes dado.
- * Las tarifas ya vienen pre-filtradas por ubicación.
- */
+/** Tarifa energía periodo BASE ($/kWh) para una (division, anio, mes). */
 export function obtenerTarifaBase(
   tarifas: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
+  anio: number,
   mes: string,
 ): number {
-  const mesUp = mes.trim().toUpperCase();
-  const estadoUp = estado.trim().toUpperCase();
-  const munUp = municipio.trim().toUpperCase();
-
-  // Try exact match first
-  let fila = tarifas.find(
-    (t) =>
-      t.estado.trim().toUpperCase() === estadoUp &&
-      t.municipio.trim().toUpperCase() === munUp &&
-      t.mes.trim().toUpperCase() === mesUp &&
-      t.intHorario.trim().toUpperCase() === 'BASE',
-  );
-
-  // Fallback: match by mes + intHorario only
-  if (!fila) {
-    fila = tarifas.find(
-      (t) =>
-        t.mes.trim().toUpperCase() === mesUp &&
-        t.intHorario.trim().toUpperCase() === 'BASE',
-    );
-  }
-
-  return fila ? fila.monto : 0;
+  const f = buscarFilaTarifa(tarifas, division, anio, mes);
+  return f ? f.tarifaBase : 0;
 }
 
 /**
@@ -178,8 +151,7 @@ export function obtenerTarifaBase(
 export function calcularCargosCapacidad(
   recibos: ReciboData[],
   tarifas: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
 ): CargoCapacidad[] {
   const MESES_MAP: Record<number, string> = {
     1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL',
@@ -189,13 +161,12 @@ export function calcularCargosCapacidad(
 
   return recibos.map((r) => {
     const mesTarifa = MESES_MAP[r.mesNum] || r.mes.toUpperCase();
-    const tarifaCap = obtenerTarifaCapacidad(tarifas, estado, municipio, mesTarifa);
-    const tarifaDist = obtenerTarifaDistribucion(tarifas, estado, municipio, mesTarifa);
+    const tarifaCap = obtenerTarifaCapacidad(tarifas, division, r.anio, mesTarifa);
+    const tarifaDist = obtenerTarifaDistribucion(tarifas, division, r.anio, mesTarifa);
 
     // Factor de carga como decimal (viene como %)
     const fc = r.factorCarga / 100;
 
-    // Piso de facturación: floor(Q / (24 * d * FC))
     let dFactPre = 0;
     if (fc > 0 && r.dias > 0) {
       dFactPre = Math.floor(r.totalConsumo / (24 * r.dias * fc));
@@ -213,6 +184,7 @@ export function calcularCargosCapacidad(
       periodo: r.mes,
       mesTarifa,
       mesNum: r.mesNum,
+      anio: r.anio,
       dias: r.dias,
       temporada: r.temporada,
       dPunta: r.demandaPunta,

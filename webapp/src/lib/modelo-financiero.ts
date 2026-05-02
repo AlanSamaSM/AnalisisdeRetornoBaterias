@@ -151,8 +151,7 @@ export function ejecutarSimulacionBess(
   params: ParametrosBESS,
   cargos: CargoCapacidad[],
   tarifas: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
   consumoBaseMap: Record<string, number>,
 ): FilaSimulacion[] {
   const simulador = new SimuladorBESS(
@@ -191,7 +190,7 @@ export function ejecutarSimulacionBess(
     const energiaCargaBase = cargaInfo.energia_carga_mes_kwh;
 
     const mesTarifa = cargo.mesTarifa;
-    const tarifaBase = obtenerTarifaBase(tarifas, estado, municipio, mesTarifa);
+    const tarifaBase = obtenerTarifaBase(tarifas, division, cargo.anio, mesTarifa);
     const costoCargaBase = energiaCargaBase * tarifaBase;
 
     const periodoKey = cargo.periodo.trim().toUpperCase();
@@ -437,8 +436,7 @@ export function ejecutarModeloFinanciero(
   params: ParametrosBESS,
   recibos: ReciboData[],
   tarifas: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
 ): ResultadoFinanciero {
   // 0. Rellenar meses vacíos con promedios
   const recibosCompletos = rellenarMesesVacios(recibos);
@@ -446,7 +444,7 @@ export function ejecutarModeloFinanciero(
   const inversionMxn = params.precioUsd * params.tipoCambio;
 
   // 1. Calcular cargos de capacidad
-  const cargos = calcularCargosCapacidad(recibosCompletos, tarifas, estado, municipio);
+  const cargos = calcularCargosCapacidad(recibosCompletos, tarifas, division);
 
   // 2. Construir mapa de consumo BASE
   const consumoBaseMap: Record<string, number> = {};
@@ -459,8 +457,7 @@ export function ejecutarModeloFinanciero(
     params,
     cargos,
     tarifas,
-    estado,
-    municipio,
+    division,
     consumoBaseMap,
   );
 

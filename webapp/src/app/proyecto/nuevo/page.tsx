@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Header from '@/components/Header';
 import { Loader2, ChevronDown, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { DIVISIONES_CFE, DIVISION_DEFAULT } from '@/lib/divisiones';
 
 /** Collapsible form section */
 function Section({
@@ -75,7 +76,7 @@ export default function NuevoProyectoPage() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     nombre: '',
-    region: 'NORTE',
+    division: DIVISION_DEFAULT as string,
     potenciaKw: '',
     capacidadKwh: '',
     precioUsd: '',
@@ -108,7 +109,7 @@ export default function NuevoProyectoPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         nombre: form.nombre,
-        region: form.region,
+        division: form.division,
         potenciaKw: parseFloat(form.potenciaKw) || 0,
         capacidadKwh: parseFloat(form.capacidadKwh) || 0,
         precioUsd: parseFloat(form.precioUsd) || 0,
@@ -203,15 +204,15 @@ export default function NuevoProyectoPage() {
                 />
               </div>
               <div>
-                <Label text="Región" tooltip="Región tarifaria CFE que aplica a este suministro" />
+                <Label text="División tarifaria CFE" required tooltip="División de distribución CFE en la que está conectado el suministro. Determina las tarifas GDMTH aplicables." />
                 <select
-                  value={form.region}
-                  onChange={(e) => setForm({ ...form, region: e.target.value })}
+                  value={form.division}
+                  onChange={(e) => setForm({ ...form, division: e.target.value })}
                   className={inputClass}
                 >
-                  <option value="NORTE">Norte</option>
-                  <option value="CENTRAL">Central</option>
-                  <option value="BAJA CALIFORNIA SUR">Baja California Sur</option>
+                  {DIVISIONES_CFE.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
                 </select>
               </div>
               <div>

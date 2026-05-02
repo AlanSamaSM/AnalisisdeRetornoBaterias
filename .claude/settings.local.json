@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.sunwise.io)",
+      "WebFetch(domain:niko.mx)"
+    ]
+  }
+}

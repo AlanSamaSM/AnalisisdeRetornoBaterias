@@ -1,37 +1,60 @@
 // =============================================================================
-// CARGAR TARIFAS — Loads GDMTH tariffas from bundled CSV
+// CARGAR TARIFAS — Loads GDMTH tarifas from bundled CSV (CFE oficial)
+// Formato: 16 cols, agrupadas en 5 filas por (anio, mes, division):
+//   - 1 fila "único"  → cargo fijo $/mes (ignorado por decisión de producto)
+//   - 3 filas "variable" → tarifaBase / tarifaIntermedia / tarifaPunta ($/kWh)
+//   - 1 fila "fijo"   → tarifaDistribucion + cargoCapacidad ($/kW)
 // =============================================================================
 
 import * as fs from 'fs';
 import * as path from 'path';
 import type { TarifaGDMTH } from './calcular-capacidad';
+import { normalizarDivision } from './divisiones';
 
-const MESES_CSV: Record<string, string> = {
-  ENERO: 'Enero',
-  FEBRERO: 'Febrero',
-  MARZO: 'Marzo',
-  ABRIL: 'Abril',
-  MAYO: 'Mayo',
-  JUNIO: 'Junio',
-  JULIO: 'Julio',
-  AGOSTO: 'Agosto',
-  SEPTIEMBRE: 'Septiembre',
-  OCTUBRE: 'Octubre',
-  NOVIEMBRE: 'Noviembre',
-  DICIEMBRE: 'Diciembre',
+// Mes (lowercase en CSV) → Forma canónica capitalizada
+const MES_CANON: Record<string, string> = {
+  enero: 'Enero',
+  febrero: 'Febrero',
+  marzo: 'Marzo',
+  abril: 'Abril',
+  mayo: 'Mayo',
+  junio: 'Junio',
+  julio: 'Julio',
+  agosto: 'Agosto',
+  septiembre: 'Septiembre',
+  octubre: 'Octubre',
+  noviembre: 'Noviembre',
+  diciembre: 'Diciembre',
 };
 
-// Cache for parsed tarifas
+// Periodo horario en CSV → Forma canónica usada por la app
+// Nota: el CSV trae "Itermedio" (sic) con mojibake de tilde. Normalizamos a INTERMEDIA.
+function normalizarPeriodoHorario(raw: string): 'BASE' | 'INTERMEDIA' | 'PUNTA' | 'NO_APLICA' {
+  const v = raw.trim().toLowerCase();
+  if (v.startsWith('base')) return 'BASE';
+  if (v.startsWith('iter') || v.startsWith('inter')) return 'INTERMEDIA';
+  if (v.startsWith('punta')) return 'PUNTA';
+  return 'NO_APLICA';
+}
+
+// Tipo de cargo en CSV → fijo / único / variable (decodifica mojibake "Ãºnico")
+function normalizarTipoCargo(raw: string): 'unico' | 'fijo' | 'variable' | 'desconocido' {
+  const v = raw.replace(/Ãº/g, 'ú').trim().toLowerCase();
+  if (v === 'único' || v === 'unico') return 'unico';
+  if (v === 'fijo') return 'fijo';
+  if (v === 'variable') return 'variable';
+  return 'desconocido';
+}
+
 let _cachedTarifas: TarifaGDMTH[] | null = null;
 
 /**
- * Loads all tarifa rows from the bundled CSV file.
- * Results are cached in memory after first call.
+ * Carga todas las tarifas del CSV oficial CFE y las pivota a una fila por
+ * (anio, mes, division). Resultado cacheado en memoria tras la primera llamada.
  */
 export function cargarTodasTarifas(): TarifaGDMTH[] {
   if (_cachedTarifas) return _cachedTarifas;
 
-  // Try multiple possible paths (dev vs standalone build)
   const possiblePaths = [
     path.join(process.cwd(), 'data', 'tarifas_gdmth.csv'),
     path.join(__dirname, '..', '..', '..', 'data', 'tarifas_gdmth.csv'),
@@ -53,143 +76,102 @@ export function cargarTodasTarifas(): TarifaGDMTH[] {
     return [];
   }
 
-  const lines = csvContent.split('\n').filter((l) => l.trim().length > 0);
-  const tarifas: TarifaGDMTH[] = [];
+  // Quitar BOM si existe
+  if (csvContent.charCodeAt(0) === 0xfeff) csvContent = csvContent.slice(1);
 
-  // Skip header (line 0)
+  const lines = csvContent.split(/\r?\n/).filter((l) => l.trim().length > 0);
+
+  // Acumulador: por clave "anio|mes|division" guardamos la fila parcial mientras
+  // recorremos las (hasta) 5 filas que componen un bloque mensual.
+  type Acc = Partial<TarifaGDMTH>;
+  const grupos = new Map<string, Acc>();
+
+  // Header en línea 0; encabezado esperado:
+  // anio,mes,categoria,descripcion,periodo_horario,cargo,unidades,division_tarifaria,
+  // tarifa_transmision,tarifa_distribucion,tarifa_cenace,tarifa_oper_suministro,
+  // cargo_scnmem,cargo_generacion,cargo_capacidad,total
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(',');
-    if (cols.length < 17) continue;
+    if (cols.length < 16) continue;
 
-    // Columns: Año[0], Estado[1], Municipio[2], Division[3], Region[4],
-    //          Temporada[5], Mes[6], Tarifa[7], Descripción[8],
-    //          Int.Horario[9], Monto[10], Unidad[11], CargoFijo[12],
-    //          Unidad[13], Distribucion[14], Unidad[15], Capacidad[16], Unidad[17]
+    const anio = parseInt(cols[0], 10);
+    if (!anio) continue;
 
-    const estado = cols[1].trim().toUpperCase();
-    const municipio = cols[2].trim().toUpperCase();
-    const mesCsv = cols[6].trim().toUpperCase();
-    const intHorario = cols[9].trim().toUpperCase();
-    const monto = parseFloat(cols[10]) || 0;
-    const capacidad = parseFloat(cols[16]) || 0;
-    const distribucion = parseFloat(cols[14]) || 0;
+    const mesRaw = cols[1].trim().toLowerCase();
+    const mes = MES_CANON[mesRaw];
+    if (!mes) continue;
 
-    const mesNombre = MESES_CSV[mesCsv] || mesCsv;
+    const periodo = normalizarPeriodoHorario(cols[4]);
+    const tipoCargo = normalizarTipoCargo(cols[5]);
 
+    const division = normalizarDivision(cols[7]);
+    if (!division) continue;
+
+    const key = `${anio}|${mes}|${division}`;
+    let acc = grupos.get(key);
+    if (!acc) {
+      acc = { anio, mes, division };
+      grupos.set(key, acc);
+    }
+
+    const tarifaDistribucion = parseFloat(cols[9]) || 0;
+    const cargoCapacidad = parseFloat(cols[14]) || 0;
+    const total = parseFloat(cols[15]) || 0;
+
+    if (tipoCargo === 'variable') {
+      // Filas Base/Intermedia/Punta — el "total" del CSV es el $/kWh efectivo
+      if (periodo === 'BASE') acc.tarifaBase = total;
+      else if (periodo === 'INTERMEDIA') acc.tarifaIntermedia = total;
+      else if (periodo === 'PUNTA') acc.tarifaPunta = total;
+    } else if (tipoCargo === 'fijo') {
+      // Fila $/kW: distribución + capacidad
+      acc.tarifaDistribucion = tarifaDistribucion;
+      acc.cargoCapacidad = cargoCapacidad;
+    }
+    // tipoCargo === 'unico' → cargo fijo mensual: ignorado por decisión de producto
+  }
+
+  const tarifas: TarifaGDMTH[] = [];
+  for (const acc of Array.from(grupos.values())) {
     tarifas.push({
-      estado,
-      municipio,
-      mes: mesNombre,
-      intHorario,
-      capacidad,
-      distribucion,
-      monto,
+      anio: acc.anio!,
+      mes: acc.mes!,
+      division: acc.division!,
+      tarifaBase: acc.tarifaBase ?? 0,
+      tarifaIntermedia: acc.tarifaIntermedia ?? 0,
+      tarifaPunta: acc.tarifaPunta ?? 0,
+      tarifaDistribucion: acc.tarifaDistribucion ?? 0,
+      cargoCapacidad: acc.cargoCapacidad ?? 0,
     });
   }
 
   _cachedTarifas = tarifas;
-  console.log(`Tarifas cargadas: ${tarifas.length} filas`);
+  console.log(`Tarifas GDMTH cargadas: ${tarifas.length} filas (anio×mes×división)`);
   return tarifas;
 }
 
 /**
- * Map of states to their nearest proxy state (for when exact match is missing).
- * Grouped by geographic/tariff similarity (same CRE division/region).
- */
-const ESTADO_PROXY: Record<string, string> = {
-  // Norte
-  'NUEVO LEON': 'COAHUILA',
-  TAMAULIPAS: 'COAHUILA',
-  CHIHUAHUA: 'COAHUILA',
-  DURANGO: 'COAHUILA',
-  'SAN LUIS POTOSI': 'COAHUILA',
-  ZACATECAS: 'AGUASCALIENTES',
-  // Bajío
-  JALISCO: 'GUANAJUATO',
-  MICHOACAN: 'GUANAJUATO',
-  COLIMA: 'GUANAJUATO',
-  NAYARIT: 'GUANAJUATO',
-  // Centro
-  PUEBLA: 'QUERETARO',
-  HIDALGO: 'QUERETARO',
-  TLAXCALA: 'QUERETARO',
-  'ESTADO DE MEXICO': 'QUERETARO',
-  'CIUDAD DE MEXICO': 'QUERETARO',
-  MORELOS: 'QUERETARO',
-};
-
-/**
- * Filters tarifas by estado and municipio.
- * Falls back to just estado match if no municipio match found.
- * Falls back to a nearby proxy state if the requested state isn't in the data.
+ * Filtra las tarifas a una sola división. Devuelve todas las filas (todos los años,
+ * todos los meses) — el filtrado por año se hace en el lookup.
  */
 export function filtrarTarifas(
   all: TarifaGDMTH[],
-  estado: string,
-  municipio: string,
+  division: string,
 ): TarifaGDMTH[] {
-  const e = estado.toUpperCase().trim();
-  const m = municipio.toUpperCase().trim();
-
-  // Try exact match on estado + municipio
-  let filtered = all.filter(
-    (t) => t.estado.toUpperCase() === e && t.municipio.toUpperCase() === m,
-  );
-
-  // Fallback: match by estado only (use first municipio found)
-  if (filtered.length === 0) {
-    const estadoRows = all.filter((t) => t.estado.toUpperCase() === e);
-    if (estadoRows.length > 0) {
-      const firstMun = estadoRows[0].municipio;
-      filtered = estadoRows.filter((t) => t.municipio === firstMun);
-      console.log(
-        `Tarifas: No exact match for ${m}, using ${firstMun} (${filtered.length} rows)`,
-      );
-    }
+  const norm = normalizarDivision(division);
+  if (!norm) {
+    console.warn(`División no reconocida: "${division}". Devolviendo lista vacía.`);
+    return [];
   }
+  return all.filter((t) => t.division === norm);
+}
 
-  // Fallback: try proxy state (geographic proximity)
-  if (filtered.length === 0 && e && ESTADO_PROXY[e]) {
-    const proxy = ESTADO_PROXY[e];
-    const proxyRows = all.filter((t) => t.estado.toUpperCase() === proxy);
-    if (proxyRows.length > 0) {
-      const firstMun = proxyRows[0].municipio;
-      filtered = proxyRows.filter((t) => t.municipio === firstMun);
-      console.log(
-        `Tarifas: Estado ${e} no disponible, usando proxy ${proxy}/${firstMun} (${filtered.length} rows)`,
-      );
-    }
-  }
-
-  // Last resort: if nothing matches, return rows for the most complete municipio
-  // (the one with all 3 horarios: BASE, INTERMEDIA, PUNTA = 36 rows)
-  if (filtered.length === 0 && all.length > 0) {
-    // Group by estado+municipio and find the most complete set
-    const groups = new Map<string, TarifaGDMTH[]>();
-    for (const t of all) {
-      const key = `${t.estado}|${t.municipio}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(t);
-    }
-
-    // Pick the group with the most rows (should be 36 = 12 months × 3 horarios)
-    let bestKey = '';
-    let bestCount = 0;
-    groups.forEach((rows, key) => {
-      if (rows.length > bestCount) {
-        bestCount = rows.length;
-        bestKey = key;
-      }
-    });
-
-    if (bestKey) {
-      filtered = groups.get(bestKey)!;
-      const [bestEst, bestMun] = bestKey.split('|');
-      console.log(
-        `Tarifas: No match for ${e}/${m}, using default ${bestEst}/${bestMun} (${filtered.length} rows, most complete)`,
-      );
-    }
-  }
-
-  return filtered;
+/**
+ * Devuelve el año más reciente disponible en las tarifas dadas.
+ * Útil para proyecciones a futuro cuando no hay tarifa del año-objetivo.
+ */
+export function anioMasRecienteDisponible(tarifas: TarifaGDMTH[]): number {
+  let max = 0;
+  for (const t of tarifas) if (t.anio > max) max = t.anio;
+  return max;
 }

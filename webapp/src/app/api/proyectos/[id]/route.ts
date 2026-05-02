@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import {
+  DIVISIONES_CFE,
+  regionIrradiacionDeDivision,
+} from '@/lib/divisiones';
 
 async function getUserId() {
   const session = await getServerSession(authOptions);
@@ -48,14 +52,23 @@ export async function PATCH(
 
   // Whitelist: only allow updating these fields to prevent overwriting protected ones
   const ALLOWED_FIELDS = [
-    'nombre', 'cliente', 'estado', 'municipio', 'region', 'tarifa', 'notas',
+    'nombre', 'cliente', 'estado', 'municipio', 'division', 'tarifa', 'notas',
     'potenciaKw', 'capacidadKwh', 'precioUsd', 'tipoCambio',
     'aniosProyeccion', 'eficiencia', 'horasCargaBase',
   ] as const;
 
   const safeData = Object.fromEntries(
     Object.entries(body).filter(([key]) => ALLOWED_FIELDS.includes(key as any)),
-  );
+  ) as Record<string, unknown>;
+
+  // Validar división y derivar región de irradiación si cambia
+  if ('division' in safeData) {
+    const div = safeData.division;
+    if (typeof div !== 'string' || !(DIVISIONES_CFE as readonly string[]).includes(div)) {
+      return NextResponse.json({ error: 'División CFE inválida' }, { status: 400 });
+    }
+    safeData.region = regionIrradiacionDeDivision(div);
+  }
 
   if (Object.keys(safeData).length === 0) {
     return NextResponse.json({ error: 'Sin campos válidos para actualizar' }, { status: 400 });
