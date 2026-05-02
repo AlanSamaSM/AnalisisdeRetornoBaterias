@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl';
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
@@ -10,9 +12,20 @@ interface ModalProps {
   children: React.ReactNode;
   /** Footer with action buttons — rendered below children */
   footer?: React.ReactNode;
+  /** Modal width. Defaults to "md". Use "2xl" or "3xl" for forms with many fields. */
+  size?: ModalSize;
 }
 
-export default function Modal({ open, onClose, title, children, footer }: ModalProps) {
+const SIZE_CLASS: Record<ModalSize, string> = {
+  sm: 'max-w-sm',
+  md: 'max-w-md',
+  lg: 'max-w-lg',
+  xl: 'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+};
+
+export default function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
@@ -48,7 +61,7 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
       aria-modal="true"
       aria-label={title}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md animate-scale-in">
+      <div className={`bg-white rounded-2xl shadow-xl w-full ${SIZE_CLASS[size]} animate-scale-in max-h-[90vh] flex flex-col`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h3 className="text-lg font-semibold text-slate-800">{title}</h3>
@@ -62,11 +75,11 @@ export default function Modal({ open, onClose, title, children, footer }: ModalP
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5">{children}</div>
+        <div className="px-6 py-5 overflow-y-auto flex-1">{children}</div>
 
         {/* Footer */}
         {footer && (
-          <div className="px-6 pb-5 flex justify-end gap-3">
+          <div className="px-6 pb-5 pt-2 flex justify-end gap-3 border-t border-slate-100">
             {footer}
           </div>
         )}
