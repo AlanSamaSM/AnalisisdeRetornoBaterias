@@ -212,13 +212,56 @@ export async function POST(req: NextRequest) {
     await prisma.recibo.deleteMany({ where: { proyectoId } });
     log.log('Recibos anteriores eliminados');
 
+    // Detect & warn about duplicate months (same mes+anio from different PDFs)
+    const seen = new Set<string>();
+    let duplicateCount = 0;
     for (const parsed of allParsed) {
-      await prisma.recibo.create({
-        data: {
+      const key = `${parsed.mes || ''}|${parsed.anio || 0}`;
+      if (seen.has(key)) {
+        duplicateCount++;
+        log.warn(`Mes duplicado detectado: ${parsed.mes} ${parsed.anio} — se usará upsert (el último sobrescribe)`);
+      }
+      seen.add(key);
+    }
+
+    for (const parsed of allParsed) {
+      const mes = parsed.mes || '';
+      const anio = parsed.anio || 0;
+      await prisma.recibo.upsert({
+        where: {
+          proyectoId_mes_anio: {
+            proyectoId,
+            mes,
+            anio,
+          },
+        },
+        update: {
+          archivoNombre: parsed.archivoOrigen || '',
+          mesNum: parsed.mesNum || 0,
+          dias: parsed.dias || 30,
+          temporada: parsed.temporada || '',
+          consumoPunta: parsed.consumoPunta || 0,
+          consumoIntermedia: parsed.consumoIntermedia || 0,
+          consumoBase: parsed.consumoBase || 0,
+          totalConsumo: parsed.totalConsumo || 0,
+          demandaPunta: parsed.demandaPunta || 0,
+          demandaIntermedia: parsed.demandaIntermedia || 0,
+          demandaBase: parsed.demandaBase || 0,
+          demandaMaxima: parsed.demandaMaxima || 0,
+          factorCarga: parsed.factorCarga || 0,
+          factorPotencia: parsed.factorPotencia || 0,
+          cargoCapacidadRecibo: parsed.cargoCapacidadRecibo || 0,
+          cargoDistribucion: parsed.cargoDistribucion || 0,
+          cargoEnergiaPunta: parsed.cargoEnergiaPunta || 0,
+          cargoEnergiaIntermedia: parsed.cargoEnergiaIntermedia || 0,
+          cargoEnergiaBase: parsed.cargoEnergiaBase || 0,
+          importeTotal: parsed.importeTotal || 0,
+        },
+        create: {
           proyectoId,
           archivoNombre: parsed.archivoOrigen || '',
-          anio: parsed.anio || 0,
-          mes: parsed.mes || '',
+          anio,
+          mes,
           mesNum: parsed.mesNum || 0,
           dias: parsed.dias || 30,
           temporada: parsed.temporada || '',
